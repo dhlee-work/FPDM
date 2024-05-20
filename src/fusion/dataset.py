@@ -6,10 +6,11 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 from transformers import AutoImageProcessor
-
+import torch
 
 class FusionDataset(Dataset):
     def __init__(self, data, args):
+        args.imgs_drop_rate = 0.1
         self.data = data
         self.args = args
         # self.PK_module = ProcessingKeypoints()
@@ -77,23 +78,25 @@ class FusionDataset(Dataset):
         pos_t_img = Image.open(pose_path)
         # pos_t_img = pos_t_img.resize(self.args.scale_size)
 
+
         if self.args.phase == 'train':
             source_img, target_img, pos_t_img = self.transforms(source_img, target_img, pos_t_img)
 
-        if self.args.encoder_type == 'clip':
-            processed_source_img = (self.image_processor(images=source_img,
-                                                         return_tensors="pt").pixel_values).squeeze(dim=0)
-            processed_target_img = (self.image_processor(images=target_img,
-                                                         return_tensors="pt").pixel_values).squeeze(dim=0)
-            processed_target_pose = (self.image_processor(images=pos_t_img,
-                                                          return_tensors="pt").pixel_values).squeeze(dim=0)
-        else:
-            source_img = transforms.functional.to_tensor(source_img)
-            processed_source_img = transforms.functional.normalize(source_img, (0.5,), (0.5,))
-            target_img = transforms.functional.to_tensor(target_img)
-            processed_target_img = transforms.functional.normalize(target_img, (0.5,), (0.5,))
-            pos_t_img = transforms.functional.to_tensor(pos_t_img)
-            processed_target_pose = transforms.functional.normalize(pos_t_img, (0.5,), (0.5,))
+
+        processed_source_img = (self.image_processor(images=source_img,
+                                                     return_tensors="pt").pixel_values).squeeze(dim=0)
+        processed_target_img = (self.image_processor(images=target_img,
+                                                     return_tensors="pt").pixel_values).squeeze(dim=0)
+        processed_target_pose = (self.image_processor(images=pos_t_img,
+                                                      return_tensors="pt").pixel_values).squeeze(dim=0)
+
+        ## dropout s_img for clip
+        if random.random() < self.args.imgs_drop_rate:
+            processed_source_img = torch.zeros(processed_source_img.shape)
+        ## dropout pos_img for clip
+        if random.random() < self.args.pose_drop_rate:
+            processed_target_pose = torch.zeros(processed_target_pose.shape)
+
 
         return dict(source_img=processed_source_img, target_img=processed_target_img, target_pose=processed_target_pose)
 
