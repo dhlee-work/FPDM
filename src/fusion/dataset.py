@@ -10,7 +10,6 @@ import torch
 
 class FusionDataset(Dataset):
     def __init__(self, data, args):
-        args.imgs_drop_rate = 0.1
         self.data = data
         self.args = args
         # self.PK_module = ProcessingKeypoints()
@@ -91,10 +90,10 @@ class FusionDataset(Dataset):
                                                       return_tensors="pt").pixel_values).squeeze(dim=0)
 
         ## dropout s_img for clip
-        if random.random() < self.args.imgs_drop_rate:
+        if random.random() < self.args.img_pose_drop_rate:
             processed_source_img = torch.zeros(processed_source_img.shape)
         ## dropout pos_img for clip
-        if random.random() < self.args.pose_drop_rate:
+        if random.random() < self.args.img_pose_drop_rate:
             processed_target_pose = torch.zeros(processed_target_pose.shape)
 
 

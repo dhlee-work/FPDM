@@ -5,7 +5,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 # from pytorch_metric_learning import losses
 # from pytorch_metric_learning.distances import CosineSimilarity
-from transformers import CLIPVisionModelWithProjection
+# from transformers import CLIPVisionModelWithProjection
+from transformers import AutoImageProcessor, AutoModel
 from torch.optim.lr_scheduler import LRScheduler
 import math
 
@@ -131,27 +132,6 @@ class Combiner(nn.Module):
         # return F.normalize(output, dim=-1)
         return output
 
-
-# class PoseProjModel(torch.nn.Module):
-#     def __init__(self, in_dim, hidden_dim, out_dim, dropout = 0.):
-#         super().__init__()
-#
-#         self.net = nn.Sequential(
-#             nn.Conv2d(in_dim, hidden_dim, kernel_size=3, stride=2),
-#             nn.GELU(),
-#             nn.Dropout(dropout),
-#             nn.LayerNorm([512, 15, 15]),
-#             nn.Conv2d(hidden_dim, hidden_dim, kernel_size=3, stride=2),
-#             nn.GELU(),
-#             nn.Dropout(dropout),
-#             nn.LayerNorm([512, 7, 7]),
-#             nn.Flatten(),
-#             nn.Linear(512*7*7, out_dim)
-#         )
-#
-#     def forward(self, x):
-#         return self.net(x)
-
 class MLP(nn.Module):
     def __init__(self, in_features, hidden_features=None, out_features=None):
         super().__init__()
@@ -190,7 +170,10 @@ class FusionModel(pl.LightningModule):
         self.lambda_l1 = self.hparams.lambda_l1
         assert self.hparams.temperature > 0.0, "The temperature must be a positive float!"
 
-        self.img_encoder = CLIPVisionModelWithProjection.from_pretrained(self.hparams.img_encoder_path)
+        # if self.hparms.encoder_type == 'clip':
+        #     self.img_encoder = CLIPVisionModelWithProjection.from_pretrained(self.hparams.img_encoder_path)
+        # elif self.hparms.encoder_type == 'dino':
+        self.img_encoder = AutoModel.from_pretrained(self.hparams.img_encoder_path)
         if not self.hparams.img_encoder_update:
             self.img_encoder.requires_grad_(False)
         self.pose_encoder = self.img_encoder
@@ -276,9 +259,9 @@ class FusionModel(pl.LightningModule):
         encoded_target = self.img_encoder(target_imgs)
         encoded_target_pose = self.pose_encoder(target_pose)
 
-        source_img_feats = encoded_source.image_embeds
-        targets_img_feats = encoded_target.image_embeds
-        target_pose_feats = encoded_target_pose.image_embeds
+        source_img_feats = encoded_source.pooler_output
+        targets_img_feats = encoded_target.pooler_output
+        target_pose_feats = encoded_target_pose.pooler_output
 
         source_patch_embeddings = encoded_source.last_hidden_state
         target_patch_embeddings = encoded_target.last_hidden_state
@@ -316,9 +299,9 @@ class FusionModel(pl.LightningModule):
         encoded_target = self.img_encoder(target_imgs)
         encoded_target_pose = self.pose_encoder(target_pose)
 
-        source_img_feats = encoded_source.image_embeds
-        targets_img_feats = encoded_target.image_embeds
-        target_pose_feats = encoded_target_pose.image_embeds
+        source_img_feats = encoded_source.pooler_output
+        targets_img_feats = encoded_target.pooler_output
+        target_pose_feats = encoded_target_pose.pooler_output
 
         source_patch_embeddings = encoded_source.last_hidden_state
         target_patch_embeddings = encoded_target.last_hidden_state

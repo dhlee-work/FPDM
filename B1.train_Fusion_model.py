@@ -76,12 +76,6 @@ train_dataset = read_dataset(config.root_path, config.train_dataset_name)
 test_dataset = read_dataset(config.root_path, config.test_dataset_name)
 len(train_dataset)
 
-dat = []
-for i in train_dataset:
-    dat.append(os.path.split(i['source_image'])[0])
-    dat.append(os.path.split(i['target_image'])[0])
-dat = list(set(dat))
-
 train_dataset = FusionDataset(train_dataset, config)
 train_dataloader = DataLoader(train_dataset,
                               num_workers=config.num_workers,
@@ -103,7 +97,7 @@ lr_monitor_cb = LearningRateMonitor(logging_interval='epoch')
 trainer = pl.Trainer(
     accelerator="gpu",
     devices=[0],
-    max_epochs=args.max_epochs,
+    max_epochs=config.max_epochs,
     callbacks=[lr_monitor_cb, ckpt_cb],
     logger=logger,
 )
