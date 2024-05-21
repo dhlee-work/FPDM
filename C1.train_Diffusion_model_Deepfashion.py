@@ -7,7 +7,6 @@ from diffusers.utils import check_min_version
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader
-from omegaconf import OmegaConf
 from src.diffusion.dataset import FPDM_Dataset, FPDM_Collate_fn
 from src.diffusion.model import FPDM
 
@@ -57,7 +56,6 @@ def load_logger(config):
 args = get_parser()
 config = OmegaConf.load(args.config)
 pl.seed_everything(config.seed_number)
-config = OmegaConf.load(config.config)
 logger, ckpt_cb = load_logger(config)
 
 traindataset = FPDM_Dataset(
@@ -99,13 +97,19 @@ lr_monitor_cb = LearningRateMonitor(logging_interval='epoch')
 
 trainer = pl.Trainer(
     accelerator="gpu",
-    devices=[0],
+    devices=config.device,
     max_epochs=config.max_epochs,
+    accumulate_grad_batches=config.accumulate_grad_batches,
     callbacks=[lr_monitor_cb, ckpt_cb],
     logger=logger, precision="16-mixed")  # precision="16-mixed"
 
 # Setting the seed
 # Check whether pretrained model exists. If yes, load it and skip training
-model = FPDM(config)
-trainer.fit(model, train_dataloader,
-            test_dataloader)  # , ckpt_path='./logs/deepfashion-fusion-CLIP-patch-learning-clip16/2024-05-16T13-47-50/last.ckpt'
+if config.trained_model_name:
+    ckpt_path = f'./logs/{config.project_name}/{config.trained_model_name}/last.ckpt'
+    model = FPDM(config)
+    trainer.fit(model, train_dataloader, test_dataloader, ckpt_path=ckpt_path)
+else:
+    model = FPDM(config)
+    trainer.fit(model, train_dataloader,
+                test_dataloader)  # , ckpt_path='./logs/deepfashion-fusion-CLIP-patch-learning-clip16/2024-05-16T13-47-50/last.ckpt'

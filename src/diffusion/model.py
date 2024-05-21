@@ -18,8 +18,8 @@ from skimage.metrics import structural_similarity as compare_ssim
 from torch import nn
 from torchvision import transforms
 from transformers import AutoImageProcessor
-from transformers import CLIPVisionModelWithProjection
-
+# from transformers import CLIPVisionModelWithProjection
+from transformers import AutoModel
 # from transformers import Dinov2Model
 from src.diffusion.models.unet_2d_condition import UNet2DConditionModel
 from src.diffusion.pipelines.pipeline import FPDM_DiffusionPipeline
@@ -204,7 +204,7 @@ class FPDM(pl.LightningModule):
 
         self.unet = UNet2DConditionModel.from_pretrained(self.hparams.pretrained_model_name_or_path, subfolder="unet",
                                                          in_channels=4, class_embed_type=self.class_embed_type,
-                                                         projection_class_embeddings_input_dim=512,
+                                                         projection_class_embeddings_input_dim=768,
                                                          low_cpu_mem_usage=False, ignore_mismatched_sizes=True)
 
         # fusion model load
@@ -215,7 +215,7 @@ class FPDM(pl.LightningModule):
         self.fusion_model_attention = self.fusion_model.attention
 
         if self.hparams.init_src_image_encoder:
-            self.src_image_encoder = CLIPVisionModelWithProjection.from_pretrained(self.hparams.src_image_encoder_path)
+            self.src_image_encoder = AutoModel.from_pretrained(self.hparams.src_image_encoder_path)
         else:
             self.src_image_encoder = self.fusion_model.img_encoder
 
@@ -324,8 +324,8 @@ class FPDM(pl.LightningModule):
             # get fusion embeddings
             embddings_src = self.fusion_model_img_encoder(processed_source_image)
             embddings_t_pos = self.fusion_model_pose_encoder(processed_target_pose)
-            s_image_embeddings = embddings_src.image_embeds
-            t_pose_embeddings = embddings_t_pos.image_embeds
+            s_image_embeddings = embddings_src.pooler_output
+            t_pose_embeddings = embddings_t_pos.pooler_output
             kv_s_image_patch_embeddings = embddings_src.last_hidden_state[:, 1:, :]
             q_t_pose_patch_embeddings = embddings_t_pos.last_hidden_state[:, 1:, :]
 
@@ -394,8 +394,8 @@ class FPDM(pl.LightningModule):
         # get fusion embeddings
         embddings_src = self.fusion_model_img_encoder(processed_source_image)
         embddings_t_pos = self.fusion_model_pose_encoder(processed_target_pose)
-        s_image_embeddings = embddings_src.image_embeds
-        t_pose_embeddings = embddings_t_pos.image_embeds
+        s_image_embeddings = embddings_src.pooler_output
+        t_pose_embeddings = embddings_t_pos.pooler_output
         kv_s_image_patch_embeddings = embddings_src.last_hidden_state[:, 1:, :]
         q_t_pose_patch_embeddings = embddings_t_pos.last_hidden_state[:, 1:, :]
 

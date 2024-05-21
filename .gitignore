@@ -545,5 +545,4 @@ Temporary Items
 *.ckpt
 *.pyc
 *.wandb
-*.yaml
 logs

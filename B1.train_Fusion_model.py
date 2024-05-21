@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 
 from src.fusion.dataset import FusionDataset
 from src.fusion.models import FusionModel
-
+from pytorch_lightning.strategies import DDPStrategy
 
 def read_dataset(root_path, filename):
     with open(os.path.join(root_path, filename), 'r') as f:
@@ -63,13 +63,8 @@ def get_parser():
     parser.add_argument("--config", type=str, default='./config/b1.fpdm.yaml', help='Path to config file')
     return parser.parse_args()
 
-
-
 args = get_parser()
 config = OmegaConf.load(args.config)
-# if args.trained_model_name:
-#     run_id = args.trained_model_name.split('-')[-1]
-#     wandb.init(id=run_id, resume="allow")
 
 logger, ckpt_cb = load_logger(config)
 train_dataset = read_dataset(config.root_path, config.train_dataset_name)
@@ -96,10 +91,13 @@ lr_monitor_cb = LearningRateMonitor(logging_interval='epoch')
 
 trainer = pl.Trainer(
     accelerator="gpu",
-    devices=[0],
+    devices=config.device,
+    # strategy='ddp',
+    # strategy="ddp2_find_unused_parameters_true",
+    accumulate_grad_batches=config.accumulate_grad_batches,
     max_epochs=config.max_epochs,
     callbacks=[lr_monitor_cb, ckpt_cb],
-    logger=logger,
+    logger=logger, precision="16-mixed"
 )
 
 # Setting the seed
