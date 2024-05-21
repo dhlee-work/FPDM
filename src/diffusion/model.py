@@ -215,7 +215,7 @@ class FPDM(pl.LightningModule):
         self.fusion_model_attention = self.fusion_model.attention
 
         if self.hparams.init_src_image_encoder:
-            self.src_image_encoder = AutoModel.from_pretrained(self.hparams.src_image_encoder_path)
+            self.src_image_encoder = AutoModel.from_pretrained(self.hparams.src_encoder_path)
         else:
             self.src_image_encoder = self.fusion_model.img_encoder
 
@@ -242,7 +242,7 @@ class FPDM(pl.LightningModule):
                                                             subfolder="scheduler")
         self.pipe.enable_xformers_memory_efficient_attention()
 
-        self.image_processor = AutoImageProcessor.from_pretrained(self.hparams.src_image_encoder_path)  # 앞으로 빼기
+        self.image_processor = AutoImageProcessor.from_pretrained(self.hparams.src_encoder_path)  # 앞으로 빼기
         self.transform = transforms.Compose(
             [
                 transforms.ToTensor(),

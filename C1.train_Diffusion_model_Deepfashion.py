@@ -27,7 +27,7 @@ def str2bool(v):
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default='./config/c1.fpdm.yaml', help='Path to config file')
+    parser.add_argument("--config", type=str, default='./config/c1.fpdm-deepfashion.yaml', help='Path to config file')
     return parser.parse_args()
 
 
@@ -62,7 +62,8 @@ traindataset = FPDM_Dataset(
     config.train_json_path,
     config.data_root_path,
     phase='train',
-    size=(config.img_width, config.img_height),  # w h
+    img_size=(config.img_width, config.img_height),
+    src_encoder_path=config.src_encoder_path,
     imgs_drop_rate=config.imgs_drop_rate,
     pose_drop_rate=config.pose_drop_rate,
 )
@@ -79,7 +80,8 @@ testdataset = FPDM_Dataset(
     config.test_json_path,
     config.data_root_path,
     phase='test',
-    size=(config.img_width, config.img_height),  # w h
+    img_size=(config.img_width, config.img_height),  # w h
+    src_encoder_path=config.src_encoder_path,
     imgs_drop_rate=0,
     pose_drop_rate=0,
 )

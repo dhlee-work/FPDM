@@ -256,14 +256,18 @@ class FusionModel(pl.LightningModule):
         target_pose = batch['target_pose']
 
         encoded_source = self.img_encoder(source_imgs)
+        source_img_feats = encoded_source.pooler_output
+        source_patch_embeddings = encoded_source.last_hidden_state
+
+
         encoded_target = self.img_encoder(target_imgs)
         encoded_target_pose = self.pose_encoder(target_pose)
 
-        source_img_feats = encoded_source.pooler_output
+
         targets_img_feats = encoded_target.pooler_output
         target_pose_feats = encoded_target_pose.pooler_output
 
-        source_patch_embeddings = encoded_source.last_hidden_state
+
         target_patch_embeddings = encoded_target.last_hidden_state
         target_pose_patch_embeddings = encoded_target_pose.last_hidden_state
 

@@ -1,4 +1,4 @@
-project_name: 'deepfashion-diffusion-model-learning-dino-g_fusion'
+project_name: 'deepfashion-diffusion-model-learning-dino-tmp'
 #root_path : './dataset/deepfashion/'
 phase: 'train'
 disable_logger: False
@@ -6,7 +6,7 @@ mode: 'client'
 port: 52162
 device: [0]
 batch_size: 20 # 64
-num_workers: 8
+num_workers: 0
 hidden_dim: 768
 lr: 0.0
 accumulate_grad_batches: 3
@@ -21,9 +21,10 @@ max_epochs: 100
 data_root_path: './dataset/deepfashion'
 train_json_path: './dataset/deepfashion/train_pairs_data.json'
 test_json_path: './dataset/deepfashion/test_pairs_data.json'
-img_width: 256
+img_width: 176
 img_height: 256
-img_eval_size: [ 176, 256 ]  # (352, 512)
+#img_train_size: [256, 256]
+img_eval_size: [176, 256]  # (352, 512)
 guidance_scale: 2.0
 num_inference_steps: 20
 seed_number: 7
@@ -32,7 +33,7 @@ test_n_samples: 10
 noise_offset: 0.1
 imgs_drop_rate: 0.1
 pose_drop_rate: 0.1
-src_image_encoder_path: 'facebook/dinov2-base' # 'openai/clip-vit-base-patch16'
+src_encoder_path: 'facebook/dinov2-base' # 'openai/clip-vit-base-patch16'
 init_src_image_encoder: False
 fusion_image_encoder: False
 fusion_image_patch_encoder: True

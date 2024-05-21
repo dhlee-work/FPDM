@@ -60,7 +60,7 @@ def str2bool(v):
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default='./config/b1.fpdm.yaml', help='Path to config file')
+    parser.add_argument("--config", type=str, default='./config/b1.fpdm-deepfashion.yaml', help='Path to config file')
     return parser.parse_args()
 
 args = get_parser()
@@ -70,7 +70,7 @@ logger, ckpt_cb = load_logger(config)
 train_dataset = read_dataset(config.root_path, config.train_dataset_name)
 test_dataset = read_dataset(config.root_path, config.test_dataset_name)
 len(train_dataset)
-
+config.phase = 'train'
 train_dataset = FusionDataset(train_dataset, config)
 train_dataloader = DataLoader(train_dataset,
                               num_workers=config.num_workers,
@@ -79,6 +79,7 @@ train_dataloader = DataLoader(train_dataset,
                               drop_last=True,
                               pin_memory=True)
 
+config.phase = 'test'
 test_dataset = FusionDataset(test_dataset, config)
 test_dataloader = DataLoader(test_dataset,
                              num_workers=config.num_workers,
@@ -97,7 +98,7 @@ trainer = pl.Trainer(
     accumulate_grad_batches=config.accumulate_grad_batches,
     max_epochs=config.max_epochs,
     callbacks=[lr_monitor_cb, ckpt_cb],
-    logger=logger, precision="16-mixed"
+    logger=logger, precision="16"
 )
 
 # Setting the seed

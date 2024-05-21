@@ -1,5 +1,5 @@
-project_name: 'deepfashion-fusion-CLIP-patch-learning-dino-last'
-root_path: './dataset/deepfashion/'
+project_name: 'market1501-fusion-DINO-patch-learning'
+root_path: './dataset/market1501/'
 device: [0]
 phase: 'train'
 disable_logger: false
@@ -19,7 +19,7 @@ scheduler_gamma: 0.5
 temperature: 0.07
 weight_decay: 0.001
 max_epochs: 10
-scale_size: [256, 256]
+img_size: [256, 256]
 lambda_l1: 0.0001
 encoder_type: 'dino' # 'clip'
 attn_hidden_dim: 768  # large-1024 base 768
