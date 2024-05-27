@@ -78,6 +78,41 @@ def reformat_market_dataset(dataset_dir):
                                'target_image': target})
     return filenames_train, filenames_test
 
+
+def reformat_sign_dataset(dataset_dir):
+    filenames_train = []
+    file_txt = '{}/five_people/sample_100000/train_pairs.txt'.format(dataset_dir)
+    data = np.loadtxt(file_txt, dtype=str, skiprows=1)
+    for i in data:
+        source = i.split(',')[0]
+        target = i.split(',')[1]
+        # source = os.path.join('./img', source)
+        # target = os.path.join('./img', target)
+        if not os.path.exists(os.path.join('./dataset', source)):
+            print(f'warnning : no such a image {source}')
+        if not os.path.exists(os.path.join('./dataset',  target)):
+            print(f'warnning : no such a image {target}')
+        filenames_train.append({'source_image': source,
+                                'target_image': target})
+    len(filenames_train)
+
+    filenames_test = []
+    file_txt = '{}/five_people/sample_100000/test_pairs.txt'.format(dataset_dir)
+    data = np.loadtxt(file_txt, dtype=str, skiprows=1)
+    for i in data:
+        source = i.split(',')[0]
+        target = i.split(',')[1]
+        # source = os.path.join('./img', source)
+        # target = os.path.join('./img', target)
+        if not os.path.exists(os.path.join('./dataset', source)):
+            print(f'warnning : no such a image {source}')
+        if not os.path.exists(os.path.join('./dataset',  target)):
+            print(f'warnning : no such a image {target}')
+        filenames_test.append({'source_image': source,
+                               'target_image': target})
+    return filenames_train, filenames_test
+
+
 def omit_image_only(_dataset, type):
     intr_path = []
     idx_bool = []
@@ -133,6 +168,7 @@ def run_preprcessing_deepfashion(resized_dirname, dataset_dir):
     with open(os.path.join(dataset_dir, f'test_pairs_data.json'), 'w') as f:
         json.dump(test_dataset, f)
     print('process finished !! ')
+
 def run_preprcessing_market1501(dataset_dir):
     image_list = glob.glob(os.path.join(dataset_dir, 'Market-1501-v15.09.15/**/*.jpg'), recursive=True)
     for i in range(len(image_list)):
@@ -147,8 +183,16 @@ def run_preprcessing_market1501(dataset_dir):
         json.dump(test_dataset, f)
     print('process finished !! ')
 
+def run_preprcessing_sign(dataset_dir):
+    train_dataset, test_dataset = reformat_sign_dataset(dataset_dir)
+    with open(os.path.join(dataset_dir, f'train_pairs_data.json'), 'w') as f:
+        json.dump(train_dataset, f)
+    with open(os.path.join(dataset_dir, f'test_pairs_data.json'), 'w') as f:
+        json.dump(test_dataset, f)
+    print('process finished !! ')
+
 root_dir = './dataset'
-dataset = 'market1501'
+dataset = 'sign' #'market1501'
 resized_dirname = 'resized_img'
 dataset_dir = os.path.join(root_dir, dataset)
 
@@ -156,6 +200,11 @@ if dataset == 'deepfashion':
     run_preprcessing_deepfashion(resized_dirname, dataset_dir)
 elif dataset == 'market1501':
     run_preprcessing_market1501(dataset_dir)
+elif dataset =='sign':
+    dataset_dir = os.path.join(root_dir, 'multi')
+    run_preprcessing_sign(dataset_dir)
 else:
     print('wrong dataset name')
+
+
 

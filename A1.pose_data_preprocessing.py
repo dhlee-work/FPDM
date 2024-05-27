@@ -4,7 +4,7 @@ import os
 import cv2
 import tqdm
 import numpy as np
-from src.fusion.datautil import ProcessingKeypoints
+from src.fusion.datautil import ProcessingKeypoints, ProcessingSignKeypoints
 
 
 def run_preprcessing_deepfashion(kpt_txts, save_dir):
@@ -65,8 +65,26 @@ def run_preprcessing_market1501(kpt_txts, save_dir):
             os.makedirs(os.path.dirname(pose_image_path), exist_ok=True)
         pos_img.save(pose_image_path, format='JPEG', quality=100)
 
+def run_preprcessing_sign(kpt_txts, save_dir):
+    param = {}
+    param['offset'] = 0
+    param['stickwidth'] = 4
+    param['anno_width'] = 512
+    param['anno_height'] = 512
+    PK = ProcessingSignKeypoints()
+    for i in tqdm.tqdm(range(len(kpt_txts))):
+        pose_image_path = kpt_txts[i].replace('pose', 'pose_img').replace('.txt', '.jpg')
+        img_path = kpt_txts[i].replace('/pose/', '/img/').replace('txt', 'jpg')
+        img = cv2.imread(img_path)
+        # h, w, c = img.shape
+        pos_img = PK.get_label_tensor(kpt_txts[i], img, param)
+        if not os.path.exists(os.path.dirname(pose_image_path)):
+            os.makedirs(os.path.dirname(pose_image_path), exist_ok=True)
+        pos_img.save(pose_image_path, format='JPEG', quality=100)
+
+
 root_dir = 'dataset'
-dataname = 'market1501' #; 'market1501' deepfashion
+dataname = 'sign' #; 'market1501' deepfashion
 if dataname == 'deepfashion':
     save_dir = 'pose_img'
     dataset_dir = os.path.join(root_dir, dataname)
@@ -87,5 +105,18 @@ elif dataname == 'market1501':
     save_path = os.path.join(root_dir, dataname, save_dir)
     kpt_txts = glob.glob(os.path.join(dataset_dir, 'pose/**/*.txt'), recursive=True)
     run_preprcessing_market1501(kpt_txts, save_dir)
+elif dataname == 'sign':
+    save_dir = 'five_people/sample_100000/pose_img'
+    dataset_dir = os.path.join(root_dir, 'multi/five_people/sample_100000')
+    save_path = os.path.join(root_dir, 'multi', save_dir)
+    if not os.path.exists(save_path):
+        os.mkdir(save_path)
+    kpt_txts = glob.glob(os.path.join(dataset_dir, 'pose/**/*.txt'), recursive=True)
+    run_preprcessing_sign(kpt_txts, save_dir)
 else:
     print('wrong data name chose deepfashion or market1501')
+
+
+
+
+

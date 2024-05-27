@@ -1,5 +1,5 @@
-project_name: 'market1501-fusion-DINO-patch-learning-split'
-root_path: './dataset/market1501/'
+project_name: 'sign-fusion-DINO-patch-learning-split'
+root_path: './dataset/multi/'
 device: [0]
 phase: 'train'
 disable_logger: false
@@ -20,7 +20,7 @@ scheduler_gamma: 0.5
 temperature: 0.07
 weight_decay: 0.01
 max_epochs: 5
-img_size: [64, 128]
+img_size: [256, 256]
 lambda_l1: 0.0001
 encoder_type: 'dino' # 'clip'
 attn_hidden_dim: 768  # large-1024 base 768
@@ -28,8 +28,8 @@ mh_attn_size: 16
 img_encoder_update: true
 trained_model_name: null
 wandb_id: null
-train_dataset_name: 'train_pairs_data.json'
-test_dataset_name: 'test_pairs_data.json'
+train_dataset_name: 'five_people/sample_100000/train_pairs_data.json'
+test_dataset_name: 'five_people/sample_100000/test_pairs_data.json'
 img_encoder_path: 'facebook/dinov2-base' # 'openai/clip-vit-base-patch16'
 train_patch_embeddings: True
 train_patch_embeddings_sampling_ratio: 0.01

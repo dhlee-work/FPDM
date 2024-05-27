@@ -7,6 +7,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader
+import numpy as np
 
 from src.fusion.dataset import FusionDataset
 from src.fusion.models import FusionModel
@@ -46,6 +47,14 @@ def load_logger(args):
 
     return logger, ckpt_cb
 
+def split_trainset(dataset, thr_ratio):
+    thr = int(len(dataset)*thr_ratio)
+    idx = np.arange(len(dataset))
+    np.random.seed(7)
+    np.random.shuffle(idx)
+    train_dataset = list(np.array(dataset)[idx][:thr])
+    valid_dataset = list(np.array(dataset)[idx][thr:])
+    return train_dataset, valid_dataset
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -68,8 +77,10 @@ config = OmegaConf.load(args.config)
 
 logger, ckpt_cb = load_logger(config)
 train_dataset = read_dataset(config.root_path, config.train_dataset_name)
-test_dataset = read_dataset(config.root_path, config.test_dataset_name)
-len(train_dataset)
+# test_dataset = read_dataset(config.root_path, config.test_dataset_name)
+train_dataset, valid_dataset = split_trainset(train_dataset, thr_ratio=0.3)
+
+
 config.phase = 'train'
 train_dataset = FusionDataset(train_dataset, config)
 train_dataloader = DataLoader(train_dataset,
@@ -79,9 +90,9 @@ train_dataloader = DataLoader(train_dataset,
                               drop_last=True,
                               pin_memory=True)
 
-config.phase = 'test'
-test_dataset = FusionDataset(test_dataset, config)
-test_dataloader = DataLoader(test_dataset,
+config.phase = 'train'
+valid_dataset = FusionDataset(valid_dataset, config)
+test_dataloader = DataLoader(valid_dataset,
                              num_workers=config.num_workers,
                              batch_size=config.batch_size,
                              shuffle=True,

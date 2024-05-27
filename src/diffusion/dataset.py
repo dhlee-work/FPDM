@@ -31,7 +31,6 @@ def FPDM_Collate_fn(data):
 
     return {
         "processed_source_image": processed_source_image,
-        # "processed_target_image": processed_target_image,
         "processed_target_pose": processed_target_pose,
         "source_image": source_image,
         "target_pose": target_pose,
@@ -79,28 +78,28 @@ class FPDM_Dataset(Dataset):
 
     def transforms(self, source_img, target_img, pos_t_img):
         # Random crop
-        if random.random() < 0.5:
-            crop = transforms.RandomResizedCrop(self.img_size)
-            params = crop.get_params(source_img, scale=(0.8, 1.1), ratio=(0.75, 1.33))
-            source_img = transforms.functional.crop(source_img, *params)
-            source_img = transforms.functional.resize(source_img, crop.size)
+        # if random.random() < 0.5:
+        crop = transforms.RandomResizedCrop(self.img_size)
+        params = crop.get_params(source_img, scale=(0.8, 1.1), ratio=(0.75, 1.33))
+        source_img = transforms.functional.crop(source_img, *params)
+        source_img = transforms.functional.resize(source_img, crop.size[::-1])
 
-            params = crop.get_params(source_img, scale=(0.8, 1.1), ratio=(0.75, 1.33))
-            target_img = transforms.functional.crop(target_img, *params)
-            target_img = transforms.functional.resize(target_img, crop.size)
+        params = crop.get_params(source_img, scale=(0.8, 1.1), ratio=(0.75, 1.33))
+        target_img = transforms.functional.crop(target_img, *params)
+        target_img = transforms.functional.resize(target_img, crop.size[::-1])
 
-            pos_t_img = transforms.functional.crop(pos_t_img, *params)
-            pos_t_img = transforms.functional.resize(pos_t_img, crop.size)
+        pos_t_img = transforms.functional.crop(pos_t_img, *params)
+        pos_t_img = transforms.functional.resize(pos_t_img, crop.size[::-1])
 
         # Random horizontal flipping
-        if random.random() < 0.5:
+        if random.random() < 0.0:
             source_img = transforms.functional.hflip(source_img)
-        if random.random() < 0.5:
+        if random.random() < 0.0:
             target_img = transforms.functional.hflip(target_img)
             pos_t_img = transforms.functional.hflip(
                 pos_t_img)  # plt.imshow(pos_t_img.numpy().transpose(1,2,0)); plt.show()
 
-        if random.random() < 0.2:  # 0.8
+        if random.random() < 0.5:  # 0.8
             jitter = transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.1)
             params = jitter.get_params(jitter.brightness, jitter.contrast, jitter.saturation, jitter.hue)
 
@@ -108,7 +107,7 @@ class FPDM_Dataset(Dataset):
                 source_img = self.ColorJitter_functions[i](source_img, params[i + 1])
                 target_img = self.ColorJitter_functions[i](target_img, params[i + 1])
 
-        if random.random() < 0.1:  # 0.2
+        if random.random() < 0.2:  # 0.2
             target_img = transforms.functional.rgb_to_grayscale(target_img, num_output_channels=3)
             source_img = transforms.functional.rgb_to_grayscale(source_img, num_output_channels=3)
 
@@ -151,7 +150,6 @@ class FPDM_Dataset(Dataset):
 
         return {
             "processed_s_img": processed_s_img,
-            # "processed_t_img": processed_t_img,
             "processed_t_pose": processed_t_pose,
             "trans_t_img": trans_t_img,
             "trans_t_pose": trans_t_pose,

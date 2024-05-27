@@ -1,44 +1,44 @@
-project_name: 'deepfashion-diffusion-model-learning-dino-g_fusion'
+project_name: 'market1501-diffusion-model-learning-dino-split-sbatch'
 #root_path : './dataset/deepfashion/'
 phase: 'train'
 disable_logger: False
 mode: 'client'
 port: 52162
 device: [0]
-batch_size: 20 # 64
+batch_size: 32 # 64
 num_workers: 8
 hidden_dim: 768
 lr: 0.0
-accumulate_grad_batches: 3
+accumulate_grad_batches: 1
 temperature: 0.07
 weight_decay: 0.01
-scheduler_t0: 40
+scheduler_t0: 100
 scheduler_t_mult: 2
-scheduler_eta_max: 0.0001
+scheduler_eta_max: 0.00001
 scheduler_t_up: 5
 scheduler_gamma: 0.5
 max_epochs: 100
-data_root_path: './dataset/deepfashion'
-train_json_path: './dataset/deepfashion/train_pairs_data.json'
-test_json_path: './dataset/deepfashion/test_pairs_data.json'
-img_width: 256
-img_height: 256
-img_eval_size: [ 176, 256 ]  # (352, 512)
+data_root_path: './dataset/market1501'
+train_json_path: './dataset/market1501/train_pairs_data.json'
+test_json_path: './dataset/market1501/test_pairs_data.json'
+img_width: 64
+img_height: 128
+img_eval_size: [ 64, 128 ]  # (352, 512)
 guidance_scale: 2.0
 num_inference_steps: 20
 seed_number: 7
 num_images_per_prompt: 4
 test_n_samples: 10
-noise_offset: 0.1
+noise_offset: 0.0
 imgs_drop_rate: 0.1
 pose_drop_rate: 0.1
-src_image_encoder_path: 'facebook/dinov2-base' # 'openai/clip-vit-base-patch16'
+src_encoder_path: 'facebook/dinov2-base' # 'openai/clip-vit-base-patch16'
 init_src_image_encoder: False
-fusion_image_encoder: False
+fusion_image_encoder: True
 fusion_image_patch_encoder: True
 trained_model_name: null
 pretrained_model_name_or_path: 'stabilityai/stable-diffusion-2-1-base'
-fusion_model_path: './logs/deepfashion-fusion-CLIP-patch-learning-dino/2024-05-20T23-27-14/last.ckpt'
+fusion_model_path: './logs/market1501-fusion-DINO-patch-learning-split/2024-05-26T13-17-56/epoch=4-step=4940.ckpt'
 visualize_images: True
 calculate_metrics: True
 loss_type: 'mse_loss'  # mse_loss, shrinkage_loss
