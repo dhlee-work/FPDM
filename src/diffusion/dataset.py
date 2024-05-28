@@ -8,7 +8,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 from transformers import AutoImageProcessor
-
+import matplotlib.pyplot as plt
 
 def FPDM_Collate_fn(data):
     processed_source_image = torch.stack([example["processed_s_img"] for example in data])
@@ -51,7 +51,6 @@ class FPDM_Dataset(Dataset):
     ):
         if isinstance(json_file, str):
             self.data = json.load(open(json_file))
-            print(len(self.data))
         else:
             self.data = json_file
         self.image_root_path = image_root_path
@@ -79,17 +78,17 @@ class FPDM_Dataset(Dataset):
     def transforms(self, source_img, target_img, pos_t_img):
         # Random crop
         # if random.random() < 0.5:
-        crop = transforms.RandomResizedCrop(self.img_size)
-        params = crop.get_params(source_img, scale=(0.8, 1.1), ratio=(0.75, 1.33))
-        source_img = transforms.functional.crop(source_img, *params)
-        source_img = transforms.functional.resize(source_img, crop.size[::-1])
-
-        params = crop.get_params(source_img, scale=(0.8, 1.1), ratio=(0.75, 1.33))
-        target_img = transforms.functional.crop(target_img, *params)
-        target_img = transforms.functional.resize(target_img, crop.size[::-1])
-
-        pos_t_img = transforms.functional.crop(pos_t_img, *params)
-        pos_t_img = transforms.functional.resize(pos_t_img, crop.size[::-1])
+        #     crop = transforms.RandomResizedCrop(self.img_size)
+        #     params = crop.get_params(source_img, scale=(0.8, 1.1), ratio=(0.75, 1.33))
+        #     source_img = transforms.functional.crop(source_img, *params)
+        #     source_img = transforms.functional.resize(source_img, crop.size[::-1])
+        #
+        #     params = crop.get_params(target_img, scale=(0.8, 1.1), ratio=(0.75, 1.33))
+        #     target_img = transforms.functional.crop(target_img, *params)
+        #     target_img = transforms.functional.resize(target_img, crop.size[::-1])
+        #
+        #     pos_t_img = transforms.functional.crop(pos_t_img, *params)
+        #     pos_t_img = transforms.functional.resize(pos_t_img, crop.size[::-1])
 
         # Random horizontal flipping
         if random.random() < 0.0:

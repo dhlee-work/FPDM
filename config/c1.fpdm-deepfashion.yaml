@@ -1,11 +1,11 @@
-project_name: 'deepfashion-diffusion-dino-split-l'
+project_name: 'deepfashion-diffusion-dino-split-l-sampled'
 #root_path : './dataset/deepfashion/'
 phase: 'train'
 disable_logger: False
 mode: 'client'
 port: 52162
 device: [0]
-batch_size: 64 # 64
+batch_size: 24 # 64
 num_workers: 8
 hidden_dim: 768
 lr: 0.0
@@ -14,12 +14,12 @@ temperature: 0.07
 weight_decay: 0.01
 scheduler_t0: 100
 scheduler_t_mult: 2
-scheduler_eta_max: 0.00001
+scheduler_eta_max: 0.0001
 scheduler_t_up: 5
 scheduler_gamma: 0.5
 max_epochs: 100
 data_root_path: './dataset/deepfashion'
-train_json_path: './dataset/deepfashion/train_pairs_data.json'
+train_json_path: './dataset/deepfashion/train_sample_pairs_data.json' # train_pairs_data
 test_json_path: './dataset/deepfashion/test_pairs_data.json'
 img_width: 176
 img_height: 256
@@ -36,9 +36,9 @@ src_encoder_path: 'facebook/dinov2-base' # 'openai/clip-vit-base-patch16'
 init_src_image_encoder: False
 fusion_image_encoder: True
 fusion_image_patch_encoder: True
-trained_model_name: null
+trained_model_name: null # '2024-05-28T10-21-27' # null
 pretrained_model_name_or_path: 'stabilityai/stable-diffusion-2-1-base'
-fusion_model_path: './logs/deepfashion-fusion-DINO-patch-learning-l64/2024-05-27T13-36-52/epoch=8-step=8433.ckpt'
+fusion_model_path: './logs/deepfashion-fusion-DINO-patch-learning-large64/2024-05-27T22-22-47/epoch=8-step=8433.ckpt'
 visualize_images: True
 calculate_metrics: True
 loss_type: 'mse_loss'  # mse_loss, shrinkage_loss

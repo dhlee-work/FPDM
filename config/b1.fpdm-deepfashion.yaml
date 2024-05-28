@@ -1,4 +1,4 @@
-project_name: 'deepfashion-fusion-DINO-patch-learning-large64-swd'
+project_name: 'deepfashion-fusion-DINO-patch-learning-large64-swd-test'
 root_path: './dataset/deepfashion/'
 device: [0]
 phase: 'train'

@@ -19,7 +19,7 @@ def reformat_deepfashion_dataset(dataset_dir, image_list):
         image_dict[_path_key] = _path0
 
     filenames_train = []
-    file_txt = '{}/annotations/fasion-resize-pairs-train.csv'.format(dataset_dir)
+    file_txt = '{}/annotations/fasion-pairs-train.csv'.format(dataset_dir)
     data = np.loadtxt(file_txt, dtype=str, skiprows=1)
     for i in data:
         source = i.split(',')[0]
@@ -32,7 +32,7 @@ def reformat_deepfashion_dataset(dataset_dir, image_list):
                                 'target_image': target_path})
 
     filenames_test = []
-    file_txt = '{}/annotations/fasion-resize-pairs-test.csv'.format(dataset_dir)
+    file_txt = '{}/annotations/fasion-pairs-test.csv'.format(dataset_dir)
     data = np.loadtxt(file_txt, dtype=str, skiprows=1)
     for i in data:
         source = i.split(',')[0]
@@ -192,7 +192,7 @@ def run_preprcessing_sign(dataset_dir):
     print('process finished !! ')
 
 root_dir = './dataset'
-dataset = 'sign' #'market1501'
+dataset = 'deepfashion' #'market1501' # sign
 resized_dirname = 'resized_img'
 dataset_dir = os.path.join(root_dir, dataset)
 
@@ -206,5 +206,32 @@ elif dataset =='sign':
 else:
     print('wrong dataset name')
 
+# dataset_dir = os.path.join(root_dir, 'multi')
+# train_dataset, test_dataset = reformat_sign_dataset(dataset_dir)
+#
+# len_data = np.arange(len(train_dataset))
+# np.random.shuffle(len_data)
+# intr_idx = len_data[:30000]
+# train_dataset = np.array(train_dataset)[intr_idx]
+# train_dataset = list(train_dataset)
+# with open(os.path.join(dataset_dir, f'train_sample_pairs_data.json'), 'w') as f:
+#     json.dump(train_dataset, f)
+
+print('annotation preprocessing')
+image_list = glob.glob(os.path.join(dataset_dir, 'img/**/*.jpg'), recursive=True)
+train_dataset, test_dataset = reformat_deepfashion_dataset(dataset_dir, image_list)
+# check if imgs has no pose annotation omit.
+train_dataset = omit_image_only(train_dataset, 'train')
+test_dataset = omit_image_only(test_dataset, 'test')
+
+len_data = np.arange(len(train_dataset))
+np.random.shuffle(len_data)
+intr_idx = len_data[:30000]
+train_dataset = np.array(train_dataset)[intr_idx]
+train_dataset = list(train_dataset)
+with open(os.path.join(dataset_dir, f'train_sample_pairs_data.json'), 'w') as f:
+    json.dump(train_dataset, f)
 
 
+with open(os.path.join(dataset_dir, f'train_pairs_data.json'), 'w') as f:
+    json.dump(train_dataset, f)

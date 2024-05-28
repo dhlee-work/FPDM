@@ -14,7 +14,7 @@ temperature: 0.07
 weight_decay: 0.01
 scheduler_t0: 100
 scheduler_t_mult: 2
-scheduler_eta_max: 0.00001
+scheduler_eta_max: 0.0001
 scheduler_t_up: 5
 scheduler_gamma: 0.5
 max_epochs: 100
