@@ -1,11 +1,11 @@
-project_name: 'market1501-diffusion-model-learning-dino-split-sbatch'
+project_name: 'market1501-diffusion-dino-split-l'
 #root_path : './dataset/deepfashion/'
 phase: 'train'
 disable_logger: False
 mode: 'client'
 port: 52162
 device: [0]
-batch_size: 32 # 64
+batch_size: 64 # 64
 num_workers: 8
 hidden_dim: 768
 lr: 0.0

@@ -1,11 +1,11 @@
-project_name: 'deepfashion-diffusion-model-learning-dino-split-sbatch'
+project_name: 'deepfashion-diffusion-dino-split-l'
 #root_path : './dataset/deepfashion/'
 phase: 'train'
 disable_logger: False
 mode: 'client'
 port: 52162
 device: [0]
-batch_size: 32 # 64
+batch_size: 64 # 64
 num_workers: 8
 hidden_dim: 768
 lr: 0.0
@@ -38,7 +38,7 @@ fusion_image_encoder: True
 fusion_image_patch_encoder: True
 trained_model_name: null
 pretrained_model_name_or_path: 'stabilityai/stable-diffusion-2-1-base'
-fusion_model_path: './logs/deepfashion-fusion-DINO-patch-learning-split/2024-05-26T13-17-57/epoch=4-step=1870.ckpt'
+fusion_model_path: './logs/deepfashion-fusion-DINO-patch-learning-l64/2024-05-27T13-36-52/epoch=8-step=8433.ckpt'
 visualize_images: True
 calculate_metrics: True
 loss_type: 'mse_loss'  # mse_loss, shrinkage_loss

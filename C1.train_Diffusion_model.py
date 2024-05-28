@@ -27,7 +27,7 @@ def str2bool(v):
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default='./config/c1.fpdm-deepfashion.yaml', help='Path to config file')
+    parser.add_argument("--config", type=str, default='./config/c1.fpdm-sign.yaml', help='Path to config file')
     return parser.parse_args()
 
 

@@ -84,13 +84,13 @@ def reformat_sign_dataset(dataset_dir):
     file_txt = '{}/five_people/sample_100000/train_pairs.txt'.format(dataset_dir)
     data = np.loadtxt(file_txt, dtype=str, skiprows=1)
     for i in data:
-        source = i.split(',')[0]
-        target = i.split(',')[1]
+        source = i.split(',')[0].replace('./multi/','./')
+        target = i.split(',')[1].replace('./multi/','./')
         # source = os.path.join('./img', source)
         # target = os.path.join('./img', target)
-        if not os.path.exists(os.path.join('./dataset', source)):
+        if not os.path.exists(os.path.join(dataset_dir, source)):
             print(f'warnning : no such a image {source}')
-        if not os.path.exists(os.path.join('./dataset',  target)):
+        if not os.path.exists(os.path.join(dataset_dir,  target)):
             print(f'warnning : no such a image {target}')
         filenames_train.append({'source_image': source,
                                 'target_image': target})
@@ -100,13 +100,13 @@ def reformat_sign_dataset(dataset_dir):
     file_txt = '{}/five_people/sample_100000/test_pairs.txt'.format(dataset_dir)
     data = np.loadtxt(file_txt, dtype=str, skiprows=1)
     for i in data:
-        source = i.split(',')[0]
-        target = i.split(',')[1]
+        source = i.split(',')[0].replace('./multi/','./')
+        target = i.split(',')[1].replace('./multi/','./')
         # source = os.path.join('./img', source)
         # target = os.path.join('./img', target)
-        if not os.path.exists(os.path.join('./dataset', source)):
+        if not os.path.exists(os.path.join(dataset_dir, source)):
             print(f'warnning : no such a image {source}')
-        if not os.path.exists(os.path.join('./dataset',  target)):
+        if not os.path.exists(os.path.join(dataset_dir,  target)):
             print(f'warnning : no such a image {target}')
         filenames_test.append({'source_image': source,
                                'target_image': target})

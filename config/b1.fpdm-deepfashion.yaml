@@ -1,30 +1,30 @@
-project_name: 'deepfashion-fusion-DINO-patch-learning-split'
+project_name: 'deepfashion-fusion-DINO-patch-learning-large64-swd'
 root_path: './dataset/deepfashion/'
 device: [0]
 phase: 'train'
 disable_logger: false
 mode: 'client'
 port: 52162
-batch_size: 80 #70
+batch_size: 64 #70
 num_workers: 8
 combiner_hidden_dim: 768  # large 768 base 512
-img_pose_drop_rate: 0.1
-thr_ratio: 0.3
+img_pose_drop_rate: 0.6
+thr_ratio: 0.6
 lr: 0.0
 accumulate_grad_batches: 1
-scheduler_t0: 5
+scheduler_t0: 10
 scheduler_t_mult: 2
 scheduler_eta_max: 0.00001
 scheduler_t_up: 2
 scheduler_gamma: 0.5
 temperature: 0.07
-weight_decay: 0.01
-max_epochs: 5
+weight_decay: 0.0001
+max_epochs: 10
 img_size: [176, 256] #[256, 256]
 lambda_l1: 0.0001
 encoder_type: 'dino' # 'clip'
 attn_hidden_dim: 768  # large-1024 base 768
-mh_attn_size: 16
+mh_attn_size: 32
 img_encoder_update: true
 trained_model_name: null
 wandb_id: null
@@ -32,4 +32,4 @@ train_dataset_name: 'train_pairs_data.json'
 test_dataset_name: 'test_pairs_data.json'
 img_encoder_path: 'facebook/dinov2-base' # 'openai/clip-vit-base-patch16'
 train_patch_embeddings: True
-train_patch_embeddings_sampling_ratio: 0.01
+train_patch_embeddings_sampling_ratio: 0.09
