@@ -1,4 +1,4 @@
-project_name: 'market1501-fusion-DINO-patch-learning-large64-swd'
+project_name: 'market1501-fusion-DINO-patch-learning'
 root_path: './dataset/market1501/'
 device: [0]
 phase: 'train'
@@ -6,7 +6,7 @@ disable_logger: false
 mode: 'client'
 port: 52162
 batch_size: 64 #70
-num_workers: 8
+num_workers: 16
 combiner_hidden_dim: 768  # large 768 base 512
 img_pose_drop_rate: 0.1
 thr_ratio: 0.6
@@ -22,7 +22,7 @@ weight_decay: 0.0001
 max_epochs: 10
 img_size: [64, 128]
 lambda_l1: 0.0001
-encoder_type: 'dino' # 'clip'
+encoder_type: 'clip' # 'clip', 'dino'
 attn_hidden_dim: 768  # large-1024 base 768
 mh_attn_size: 32
 img_encoder_update: true
@@ -30,6 +30,6 @@ trained_model_name: null
 wandb_id: null
 train_dataset_name: 'train_pairs_data.json'
 test_dataset_name: 'test_pairs_data.json'
-img_encoder_path: 'facebook/dinov2-base' # 'openai/clip-vit-base-patch16'
+img_encoder_path: 'facebook/dinov2-base' # 'facebook/dinov2-base' # 'openai/clip-vit-base-patch16'
 train_patch_embeddings: True
 train_patch_embeddings_sampling_ratio: 0.09

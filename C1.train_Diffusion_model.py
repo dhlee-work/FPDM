@@ -27,7 +27,7 @@ def str2bool(v):
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default='./config/c1.fpdm-deepfashion.yaml', help='Path to config file')
+    parser.add_argument("--config", type=str, default='./config/c1.fpdm-clip-deepfashion.yaml', help='Path to config file')
     return parser.parse_args()
 
 
@@ -91,7 +91,7 @@ test_dataloader = DataLoader(
     collate_fn=FPDM_Collate_fn,
     batch_size=config.batch_size,
     num_workers=config.num_workers,
-    shuffle=True,
+    shuffle=False,
     drop_last=True,
     pin_memory=True)
 

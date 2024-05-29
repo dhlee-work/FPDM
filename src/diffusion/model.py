@@ -147,8 +147,8 @@ class SDModel(torch.nn.Module):
     def __init__(self, unet, args) -> None:
         super().__init__()
         self.args = args
-        self.image_proj_model_s = ImageProjModel_s(in_dim=768, hidden_dim=768, out_dim=1024)
-        self.image_proj_model_f = ImageProjModel_f(in_dim=768, hidden_dim=768, out_dim=1024)
+        self.image_proj_model_s = ImageProjModel_s(in_dim=args.proj_in_dim, hidden_dim=768, out_dim=1024)
+        self.image_proj_model_f = ImageProjModel_f(in_dim=args.proj_in_dim, hidden_dim=768, out_dim=1024)
         # self.feature_proj_model_s = ImageProjModel_f(in_dim=512, hidden_dim=768, out_dim=768)
         self.unet = unet
         self.pose_proj = ControlNetConditioningEmbedding(
@@ -324,8 +324,13 @@ class FPDM(pl.LightningModule):
             # get fusion embeddings
             embddings_src = self.fusion_model_img_encoder(processed_source_image)
             embddings_t_pos = self.fusion_model_pose_encoder(processed_target_pose)
-            s_image_embeddings = embddings_src.pooler_output
-            t_pose_embeddings = embddings_t_pos.pooler_output
+
+            if self.hparams.src_encoder_type == 'clip':
+                s_image_embeddings = embddings_src.image_embeds
+                t_pose_embeddings = embddings_t_pos.image_embeds
+            else:
+                s_image_embeddings = embddings_src.pooler_output
+                t_pose_embeddings = embddings_t_pos.pooler_output
             kv_s_image_patch_embeddings = embddings_src.last_hidden_state[:, 1:, :]
             q_t_pose_patch_embeddings = embddings_t_pos.last_hidden_state[:, 1:, :]
 
@@ -394,8 +399,12 @@ class FPDM(pl.LightningModule):
         # get fusion embeddings
         embddings_src = self.fusion_model_img_encoder(processed_source_image)
         embddings_t_pos = self.fusion_model_pose_encoder(processed_target_pose)
-        s_image_embeddings = embddings_src.pooler_output
-        t_pose_embeddings = embddings_t_pos.pooler_output
+        if self.hparams.src_encoder_type == 'clip':
+            s_image_embeddings = embddings_src.image_embeds
+            t_pose_embeddings = embddings_t_pos.image_embeds
+        else:
+            s_image_embeddings = embddings_src.pooler_output
+            t_pose_embeddings = embddings_t_pos.pooler_output
         kv_s_image_patch_embeddings = embddings_src.last_hidden_state[:, 1:, :]
         q_t_pose_patch_embeddings = embddings_t_pos.last_hidden_state[:, 1:, :]
 

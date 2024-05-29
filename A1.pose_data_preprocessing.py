@@ -85,6 +85,8 @@ def run_preprcessing_sign(kpt_txts, save_dir):
 
 root_dir = 'dataset'
 dataname = 'sign' #; 'market1501' deepfashion
+dataset_type = 'test'
+
 if dataname == 'deepfashion':
     save_dir = 'pose_img'
     dataset_dir = os.path.join(root_dir, dataname)
@@ -105,10 +107,17 @@ elif dataname == 'market1501':
     save_path = os.path.join(root_dir, dataname, save_dir)
     kpt_txts = glob.glob(os.path.join(dataset_dir, 'pose/**/*.txt'), recursive=True)
     run_preprcessing_market1501(kpt_txts, save_dir)
+
 elif dataname == 'sign':
-    save_dir = 'five_people/sample_100000/pose_img'
-    dataset_dir = os.path.join(root_dir, 'multi/five_people/sample_100000')
-    save_path = os.path.join(root_dir, 'multi', save_dir)
+    if not dataset_type == 'test':
+        save_dir = 'five_people/sample_100000/pose_img'
+        dataset_dir = os.path.join(root_dir, 'multi/five_people/sample_100000')
+        save_path = os.path.join(root_dir, 'multi', save_dir)
+    else:
+        save_dir = './one_video_test/J/CUSH11632A_A11/pose_img'
+        dataset_dir = os.path.join(root_dir, './one_video_test/J/CUSH11632A_A11')
+        save_path = os.path.join(root_dir, save_dir)
+
     if not os.path.exists(save_path):
         os.mkdir(save_path)
     kpt_txts = glob.glob(os.path.join(dataset_dir, 'pose/**/*.txt'), recursive=True)

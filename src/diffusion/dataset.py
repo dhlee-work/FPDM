@@ -78,17 +78,17 @@ class FPDM_Dataset(Dataset):
     def transforms(self, source_img, target_img, pos_t_img):
         # Random crop
         # if random.random() < 0.5:
-        #     crop = transforms.RandomResizedCrop(self.img_size)
-        #     params = crop.get_params(source_img, scale=(0.8, 1.1), ratio=(0.75, 1.33))
-        #     source_img = transforms.functional.crop(source_img, *params)
-        #     source_img = transforms.functional.resize(source_img, crop.size[::-1])
-        #
-        #     params = crop.get_params(target_img, scale=(0.8, 1.1), ratio=(0.75, 1.33))
-        #     target_img = transforms.functional.crop(target_img, *params)
-        #     target_img = transforms.functional.resize(target_img, crop.size[::-1])
-        #
-        #     pos_t_img = transforms.functional.crop(pos_t_img, *params)
-        #     pos_t_img = transforms.functional.resize(pos_t_img, crop.size[::-1])
+        crop = transforms.RandomResizedCrop(self.img_size)
+        params = crop.get_params(source_img, scale=(0.8, 1.1), ratio=(0.75, 1.33))
+        source_img = transforms.functional.crop(source_img, *params)
+        source_img = transforms.functional.resize(source_img, crop.size[::-1])
+
+        # params = crop.get_params(target_img, scale=(0.8, 1.1), ratio=(0.75, 1.33))
+        target_img = transforms.functional.crop(target_img, *params)
+        target_img = transforms.functional.resize(target_img, crop.size[::-1])
+
+        pos_t_img = transforms.functional.crop(pos_t_img, *params)
+        pos_t_img = transforms.functional.resize(pos_t_img, crop.size[::-1])
 
         # Random horizontal flipping
         if random.random() < 0.0:
@@ -116,20 +116,17 @@ class FPDM_Dataset(Dataset):
         item = self.data[idx]
 
         s_img_path = os.path.join(self.image_root_path, item["source_image"])  # .replace(".jpg", ".jpg")) # png
-        s_img = Image.open(s_img_path).convert("RGB").resize(self.img_size,
-                                                   Image.BICUBIC)
+        s_img = Image.open(s_img_path).resize(self.img_size, Image.BICUBIC)
 
         t_img_path = os.path.join(self.image_root_path, item["target_image"])
-        t_img = Image.open(t_img_path).convert("RGB").resize(self.img_size,
-                                                   Image.BICUBIC)
+        t_img = Image.open(t_img_path).resize(self.img_size, Image.BICUBIC)
 
-        t_pose = Image.open(t_img_path.replace("/img/", "/pose_img/")).convert("RGB").resize(
+        t_pose = Image.open(t_img_path.replace("/img/", "/pose_img/")).resize(
             self.img_size, Image.BICUBIC)
 
         # if self.args.phase == 'train':
         if self.phase == 'train':
             s_img, t_img, t_pose = self.transforms(s_img, t_img, t_pose)
-
 
         trans_s_img = self.transform_normalize(s_img)
         trans_t_img = self.transform_normalize(t_img)

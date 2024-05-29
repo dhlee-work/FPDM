@@ -1,4 +1,4 @@
-project_name: 'sign-diffusion-dino-split-l-sampled'
+project_name: 'sign-diffusion-dino-split-l'
 #root_path : './dataset/deepfashion/'
 phase: 'train'
 disable_logger: False
@@ -11,7 +11,7 @@ hidden_dim: 768
 lr: 0.0
 accumulate_grad_batches: 1
 temperature: 0.07
-weight_decay: 0.01
+weight_decay: 0.001
 scheduler_t0: 100
 scheduler_t_mult: 2
 scheduler_eta_max: 0.0001
@@ -19,7 +19,7 @@ scheduler_t_up: 5
 scheduler_gamma: 0.5
 max_epochs: 100
 data_root_path: './dataset/multi'
-train_json_path: './dataset/multi/train_sample_pairs_data.json' # train_pairs_data
+train_json_path: './dataset/multi/train_pairs_data.json' # train_pairs_data
 test_json_path: './dataset/multi/test_pairs_data.json'
 img_width: 256
 img_height: 256
@@ -29,10 +29,11 @@ num_inference_steps: 20
 seed_number: 7
 num_images_per_prompt: 4
 test_n_samples: 10
-noise_offset: 0.0
+noise_offset: 0.1
 imgs_drop_rate: 0.1
 pose_drop_rate: 0.1
-src_encoder_path: 'facebook/dinov2-base' # 'openai/clip-vit-base-patch16'
+src_encoder_path: 'facebook/dinov2-base' # 'openai/clip-vit-large-patch14'
+src_encoder_type: 'dino' # 'clip', 'dino'
 init_src_image_encoder: False
 fusion_image_encoder: True
 fusion_image_patch_encoder: True

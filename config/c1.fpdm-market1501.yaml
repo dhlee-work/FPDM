@@ -33,6 +33,7 @@ noise_offset: 0.0
 imgs_drop_rate: 0.1
 pose_drop_rate: 0.1
 src_encoder_path: 'facebook/dinov2-base' # 'openai/clip-vit-base-patch16'
+src_encoder_type: 'dino' # 'clip', 'dino'
 init_src_image_encoder: False
 fusion_image_encoder: True
 fusion_image_patch_encoder: True

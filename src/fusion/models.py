@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 # from pytorch_metric_learning import losses
 # from pytorch_metric_learning.distances import CosineSimilarity
-# from transformers import CLIPVisionModelWithProjection
+from transformers import CLIPVisionModelWithProjection
 from transformers import AutoImageProcessor, AutoModel
 from torch.optim.lr_scheduler import LRScheduler
 import math
@@ -170,10 +170,10 @@ class FusionModel(pl.LightningModule):
         self.lambda_l1 = self.hparams.lambda_l1
         assert self.hparams.temperature > 0.0, "The temperature must be a positive float!"
 
-        # if self.hparms.encoder_type == 'clip':
-        #     self.img_encoder = CLIPVisionModelWithProjection.from_pretrained(self.hparams.img_encoder_path)
-        # elif self.hparms.encoder_type == 'dino':
-        self.img_encoder = AutoModel.from_pretrained(self.hparams.img_encoder_path)
+        if self.hparams.encoder_type == 'clip':
+            self.img_encoder = CLIPVisionModelWithProjection.from_pretrained(self.hparams.img_encoder_path)
+        elif self.hparams.encoder_type == 'dino':
+            self.img_encoder = AutoModel.from_pretrained(self.hparams.img_encoder_path)
         if not self.hparams.img_encoder_update:
             self.img_encoder.requires_grad_(False)
         self.pose_encoder = self.img_encoder
@@ -244,6 +244,7 @@ class FusionModel(pl.LightningModule):
             dim=-1,
         )
         sim_argsort = comb_sim.argsort(dim=-1, descending=True).argmin(dim=-1)
+
         # Logging ranking metrics
         self.log(mode + "_fushion_acc_top1", (sim_argsort == 0).float().mean())
         self.log(mode + "_fushion_acc_top5", (sim_argsort < 5).float().mean())
@@ -256,18 +257,19 @@ class FusionModel(pl.LightningModule):
         target_pose = batch['target_pose']
 
         encoded_source = self.img_encoder(source_imgs)
-        source_img_feats = encoded_source.pooler_output
-        source_patch_embeddings = encoded_source.last_hidden_state
-
-
         encoded_target = self.img_encoder(target_imgs)
         encoded_target_pose = self.pose_encoder(target_pose)
 
+        if self.hparams.encoder_type == 'clip':
+            source_img_feats = encoded_source.image_embeds
+            targets_img_feats = encoded_target.image_embeds
+            target_pose_feats = encoded_target_pose.image_embeds
+        else:
+            source_img_feats = encoded_source.pooler_output
+            targets_img_feats = encoded_target.pooler_output
+            target_pose_feats = encoded_target_pose.pooler_output
 
-        targets_img_feats = encoded_target.pooler_output
-        target_pose_feats = encoded_target_pose.pooler_output
-
-
+        source_patch_embeddings = encoded_source.last_hidden_state
         target_patch_embeddings = encoded_target.last_hidden_state
         target_pose_patch_embeddings = encoded_target_pose.last_hidden_state
 
@@ -283,7 +285,7 @@ class FusionModel(pl.LightningModule):
             c_rand_idx = rand_idx[:int(bs * self.hparams.train_patch_embeddings_sampling_ratio)]
             patch_info_ncs_loss = self.attention_fusion_info_nce_loss(source_patch_embeddings[c_rand_idx],
                                                                       target_patch_embeddings[c_rand_idx],
-                                                                      fusion_patch_embeddings[c_rand_idx])
+                                                                      fusion_patch_embeddings[c_rand_idx], mode="train")
         else:
             patch_info_ncs_loss = 0
         fusion_img_feats = self.combiner(source_img_feats, target_pose_feats)
@@ -303,9 +305,14 @@ class FusionModel(pl.LightningModule):
         encoded_target = self.img_encoder(target_imgs)
         encoded_target_pose = self.pose_encoder(target_pose)
 
-        source_img_feats = encoded_source.pooler_output
-        targets_img_feats = encoded_target.pooler_output
-        target_pose_feats = encoded_target_pose.pooler_output
+        if self.hparams.encoder_type == 'clip':
+            source_img_feats = encoded_source.image_embeds
+            targets_img_feats = encoded_target.image_embeds
+            target_pose_feats = encoded_target_pose.image_embeds
+        else:
+            source_img_feats = encoded_source.pooler_output
+            targets_img_feats = encoded_target.pooler_output
+            target_pose_feats = encoded_target_pose.pooler_output
 
         source_patch_embeddings = encoded_source.last_hidden_state
         target_patch_embeddings = encoded_target.last_hidden_state
@@ -323,7 +330,7 @@ class FusionModel(pl.LightningModule):
             c_rand_idx = rand_idx[:int(bs * self.hparams.train_patch_embeddings_sampling_ratio)]
             patch_info_ncs_loss = self.attention_fusion_info_nce_loss(source_patch_embeddings[c_rand_idx],
                                                                       target_patch_embeddings[c_rand_idx],
-                                                                      fusion_patch_embeddings[c_rand_idx])
+                                                                      fusion_patch_embeddings[c_rand_idx], mode="val")
         else:
             patch_info_ncs_loss = 0
         fusion_img_feats = self.combiner(source_img_feats, target_pose_feats)
@@ -333,126 +340,3 @@ class FusionModel(pl.LightningModule):
         total_loss = global_info_ncs_loss + patch_info_ncs_loss
         self.log('val' + "_loss", total_loss.float().mean())
         return total_loss
-
-# class FusionSimCLR_pool(pl.LightningModule):
-#     def __init__(self, hidden_dim, lr, temperature, weight_decay, max_epochs=500):
-#         super().__init__()
-#         self.save_hyperparameters()
-#         assert self.hparams.temperature > 0.0, "The temperature must be a positive float!"
-#         # Base model f(.)
-#         # pretrained_model = KptImgSimCLR.load_from_checkpoint(
-#         #     './logs/kptimg-infonce-learning/2024-04-29T01-18-53/last.ckpt') ## ?????????????  , simcrl 2024-04-29T01-17-45 # triplet 2024-04-29T01-18-53
-#         # img_encoder = pretrained_model.img_convnet
-#         # kpt_encoder = pretrained_model.kpt_convnet
-#         # self.img_encoder = img_encoder
-#         # self.kpt_encoder = kpt_encoder
-#
-#         self.img_encoder = torchvision.models.resnet18(pretrained=False)  # num_classes is the output size of the last linear layer
-#         # self.img_encoder.fc = nn.Identity()
-#         self.img_encoder.avgpool = nn.Flatten()
-#         self.img_encoder.fc = nn.Sequential(
-#             nn.ReLU(),
-#             nn.Linear(32768, hidden_dim),
-#         )
-#
-#         self.kpt_encoder = torchvision.models.resnet18(pretrained=False)  # num_classes is the output size of the last linear layer
-#         self.kpt_encoder.avgpool = nn.Flatten()
-#         self.kpt_encoder.fc = nn.Sequential(
-#             nn.ReLU(),
-#             nn.Linear(32768, hidden_dim),
-#         )
-#         self.combiner = Combiner(img_feature_dim=hidden_dim, projection_dim=512, hidden_dim=512) # 768
-#
-#         # self.freeze_model(img_encoder, freeze=False)
-#         # self.freeze_model(kpt_encoder, freeze=False)
-#
-#     def freeze_model(self, model, freeze=True):
-#         if freeze:
-#             for param in model.parameters():
-#                 param.requires_grad = False
-#         else:
-#             for param in model.parameters():
-#                 param.requires_grad = True
-#
-#     def configure_optimizers(self):
-#         optimizer = optim.AdamW(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
-#         lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(
-#             optimizer, T_max=self.hparams.max_epochs, eta_min=self.hparams.lr / 50
-#         )
-#         return [optimizer], [lr_scheduler]
-#
-#     def fusion_info_nce_loss(self, img_feats, fushion_feats, mode="train"):
-#         # Calculate cosine similarity
-#         cos_sim = F.cosine_similarity(img_feats[:, None, :], fushion_feats[None, :, :], dim=-1)
-#         # Mask out cosine similarity to itself
-#         pos_mask = torch.eye(cos_sim.shape[0], dtype=torch.bool, device=cos_sim.device)
-#         # cos_sim.masked_fill_(self_mask, -9e15)
-#         # Find positive example -> batch_size//2 away from the original example
-#         # pos_mask = self_mask.roll(shifts=cos_sim.shape[0] // 2, dims=0)
-#         # InfoNCE loss
-#         cos_sim = cos_sim / self.hparams.temperature
-#         nll = -cos_sim[pos_mask] + torch.logsumexp(cos_sim, dim=-1)
-#
-#         # nll =  torch.mean(torch.abs(img_feats - fushion_feats), dim=-1)
-#         nll = nll.mean()
-#
-#         # Logging loss
-#         self.log(mode + "_loss", nll)
-#         # Get ranking position of positive example
-#         comb_sim = torch.cat(
-#             [cos_sim[pos_mask][:, None], cos_sim.masked_fill(pos_mask, -9e15)],  # First position positive example
-#             dim=-1,
-#         )
-#         sim_argsort = comb_sim.argsort(dim=-1, descending=True).argmin(dim=-1)
-#         # Logging ranking metrics
-#         self.log(mode + "_fushion_acc_top1", (sim_argsort == 0).float().mean())
-#         self.log(mode + "_fushion_acc_top5", (sim_argsort < 5).float().mean())
-#         self.log(mode + "_fushion_acc_mean_pos", 1 + sim_argsort.float().mean())
-#         return nll
-#
-#     def training_step(self, batch, batch_idx):
-#         reference_imgs = batch['reference_img']
-#         target_imgs = batch['target_img']
-#         target_kpts = batch['target_kpt']
-#
-#         refer_img_feats = self.img_encoder(reference_imgs)
-#         targets_img_feats = self.img_encoder(target_imgs)
-#         target_kpts_feats = self.kpt_encoder(target_kpts)
-#
-#         fusion_img_feats = self.combiner(refer_img_feats, target_kpts_feats)
-#         info_ncs_loss = self.fusion_info_nce_loss(targets_img_feats, fusion_img_feats, mode="train")
-#         total_loss = info_ncs_loss
-#         self.log('train' + "_total_loss", total_loss.float().mean())
-#         return total_loss
-#
-#     def validation_step(self, batch, batch_idx):
-#         reference_imgs = batch['reference_img']
-#         target_imgs = batch['target_img']
-#         target_kpts = batch['target_kpt']
-#
-#         refer_img_feats = self.img_encoder(reference_imgs)
-#         targets_img_feats = self.img_encoder(target_imgs)
-#         target_kpts_feats = self.kpt_encoder(target_kpts)
-#         fusion_img_feats = self.combiner(refer_img_feats, target_kpts_feats)
-#         info_ncs_loss = self.fusion_info_nce_loss(targets_img_feats, fusion_img_feats, mode="val")
-#         total_loss = info_ncs_loss
-#         self.log('val' + "_total_loss", total_loss.float().mean())
-#         return total_loss
-#
-# class ContrastiveLoss(torch.nn.Module):
-#     """
-#     Contrastive loss function.
-#     Based on: http://yann.lecun.com/exdb/publis/pdf/hadsell-chopra-lecun-06.pdf
-#     0 : positivie
-#     1 : negative
-#     """
-#     def __init__(self, margin=1.0):
-#         super(ContrastiveLoss, self).__init__()
-#         self.margin = margin
-#
-#     def forward(self, output1, output2, label):
-#         euclidean_distance = F.cosine_similarity(output1, output2)
-#         # euclidean_distance = F.pairwise_distance(output1, output2, keepdim = True)
-#         loss_contrastive = torch.mean((1-label) * torch.pow(1- euclidean_distance, 2) +
-#                                       (label) * torch.pow(torch.clamp(self.margin - 1 - euclidean_distance, min=0.0), 2))
-#         return loss_contrastive

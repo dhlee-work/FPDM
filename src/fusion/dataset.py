@@ -32,7 +32,7 @@ class FusionDataset(Dataset):
         source_img = transforms.functional.crop(source_img, *params)
         source_img = transforms.functional.resize(source_img, crop.size[::-1])
 
-        params = crop.get_params(source_img, scale=(0.8, 1.1), ratio=(0.75, 1.33))
+        # params = crop.get_params(source_img, scale=(0.8, 1.1), ratio=(0.75, 1.33))
         target_img = transforms.functional.crop(target_img, *params)
         target_img = transforms.functional.resize(target_img, crop.size[::-1])
 
