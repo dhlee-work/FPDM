@@ -1,6 +1,5 @@
 project_name: 'market1501-diffusion-dino-split-l'
 #root_path : './dataset/deepfashion/'
-phase: 'train'
 disable_logger: False
 mode: 'client'
 port: 52162
@@ -21,6 +20,7 @@ max_epochs: 100
 data_root_path: './dataset/market1501'
 train_json_path: './dataset/market1501/train_pairs_data.json'
 test_json_path: './dataset/market1501/test_pairs_data.json'
+phase : 'train'
 img_width: 64
 img_height: 128
 img_eval_size: [ 64, 128 ]  # (352, 512)
@@ -30,6 +30,7 @@ seed_number: 7
 num_images_per_prompt: 4
 test_n_samples: 10
 noise_offset: 0.0
+module_drop_rate: 0.2
 imgs_drop_rate: 0.1
 pose_drop_rate: 0.1
 src_encoder_path: 'facebook/dinov2-base' # 'openai/clip-vit-base-patch16'

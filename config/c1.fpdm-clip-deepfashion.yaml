@@ -1,48 +1,53 @@
-project_name: 'deepfashion-diffusion-clip-split-l'
+project_name: 'deepfashion-diffusion-clip-split-dropm-dropp-transc-init-wd005-catembd-b1-size512'
 #root_path : './dataset/deepfashion/'
-phase: 'train'
 disable_logger: False
 mode: 'client'
 port: 52162
 device: [0]
-batch_size: 64 # 64
-num_workers: 8
+batch_size: 1 # 64
+num_workers: 16
 lr: 0.0
 accumulate_grad_batches: 1
 temperature: 0.07
-weight_decay: 0.01
-scheduler_t0: 100
+weight_decay: 0.05
+scheduler_t0: 400
 scheduler_t_mult: 2
 scheduler_eta_max: 0.0001
 scheduler_t_up: 5
-scheduler_gamma: 0.5
-max_epochs: 100
+scheduler_gamma: 1.0
+max_epochs: 400
 data_root_path: './dataset/deepfashion'
-train_json_path: './dataset/deepfashion/train_sample_pairs_data.json' # train_pairs_data
+train_json_path: './dataset/deepfashion/train_pairs_data.json' # train_pairs_data
 test_json_path: './dataset/deepfashion/test_pairs_data.json'
-img_width: 176
-img_height: 256
-img_eval_size: [176, 256]  # (352, 512)
+phase : 'train'
+model_img_size : [512, 512]
+img_size: [176, 256]  # (352, 512)
 guidance_scale: 2.0
 num_inference_steps: 20
 seed_number: 7
 num_images_per_prompt: 4
-test_n_samples: 10
+test_n_samples: 20
 noise_offset: 0.1
+module_drop_rate: 0.2
 imgs_drop_rate: 0.1
 pose_drop_rate: 0.1
+proj_drop_rate: 0.5
 src_encoder_path: 'openai/clip-vit-large-patch14' #'facebook/dinov2-base' # 'openai/clip-vit-base-patch16'
 src_encoder_type: 'clip' # 'clip', 'dino'
-proj_in_dim: 1024
+init_src_image_encoder: true
+fusion_image_patch_encoder: true
+proj_fusion_image_patch_encoder: true
+patch_proj_in_dim: 1024
 hidden_dim: 768
-init_src_image_encoder: False
-fusion_image_encoder: True
-fusion_image_patch_encoder: True
-trained_model_name: null # '2024-05-28T10-21-27' # null
+fusion_image_encoder: true
+class_embed_type : 'mlp'  # 'embd-from-mlp' # "projection"
+image_proj_in_dim : 768
+proj_embd_concat: true
+trained_model_name: null # '2024-06-05T00-35-10' #null # '2024-05-30T18-59-18' # '2024-05-28T10-21-27' # null
 pretrained_model_name_or_path: 'stabilityai/stable-diffusion-2-1-base'
-fusion_model_path: './logs/deepfashion-fusion-CLIP-patch-learning/2024-05-28T20-29-57/last.ckpt'
-visualize_images: True
-calculate_metrics: True
+fusion_model_path: './logs/deepfashion-fusion-CLIP-patch-learning-fixt-b48-p01/2024-06-04T03-10-10/last.ckpt' # './logs/deepfashion-fusion-CLIP-patch-learning/2024-05-28T20-29-57/last.ckpt'
+visualize_images: true
+calculate_metrics: true
 loss_type: 'mse_loss'  # mse_loss, shrinkage_loss
 shrinkage_a: 50
 shrinkage_c: 0.05

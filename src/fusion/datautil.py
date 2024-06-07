@@ -108,10 +108,12 @@ class ProcessingSignKeypoints():
 
         color_d = np.arange(0, 256, 1)
         np.random.seed(777)
-        # colors_list = np.random.choice(color_d, 3 * 133).reshape(133, 3)
-        # self.colors = colors_list.tolist()
-
-        self.colors = [[125, 125, 125]]
+        color_c = True
+        if color_c == True:
+            colors_list = np.random.choice(color_d, 3 * 133).reshape(133, 3)
+            self.colors = colors_list.tolist()
+        else:
+            self.colors = [[125, 125, 125]]
 
     def trans_keypoins(self, keypoints, param, img_size):
         missing_keypoint_index = keypoints == 0
@@ -147,7 +149,7 @@ class ProcessingSignKeypoints():
             x, y = keypoint[i, 0:2]
             if x == -1 or y == -1:
                 continue
-            cv2.circle(canvas, (int(x), int(y)), 2, self.colors[0], thickness=-1)
+            cv2.circle(canvas, (int(x), int(y)), 2, self.colors[i], thickness=-1)
         joints = []
         for i in range(117):
             Y = keypoint[np.array(self.limbSeq[i])-1, 0]
@@ -161,7 +163,7 @@ class ProcessingSignKeypoints():
             length = ((X[0] - X[1]) ** 2 + (Y[0] - Y[1]) ** 2) ** 0.5
             angle = math.degrees(math.atan2(X[0] - X[1], Y[0] - Y[1]))
             polygon = cv2.ellipse2Poly((int(mY), int(mX)), (int(length / 2), stickwidth), int(angle), 0, 360, 1)
-            cv2.fillConvexPoly(cur_canvas, polygon, self.colors[0])
+            cv2.fillConvexPoly(cur_canvas, polygon, self.colors[i])
             canvas = cv2.addWeighted(canvas, 0.4, cur_canvas, 0.6, 0)
 
             joint = np.zeros_like(cur_canvas[:, :, 0])

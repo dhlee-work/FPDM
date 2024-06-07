@@ -25,9 +25,10 @@ from src.diffusion.models.unet_2d_condition import UNet2DConditionModel
 from src.diffusion.pipelines.pipeline import FPDM_DiffusionPipeline
 from src.fusion.models import FusionModel
 from src.metrics.metrics import FID, LPIPS, Reconstruction_Metrics
-
+from transformers import CLIPVisionModelWithProjection
 import math
 from torch.optim.lr_scheduler import LRScheduler
+import random
 
 class CosineAnnealingWarmUpRestarts(LRScheduler):
     def __init__(self, optimizer, T_0, T_mult=1, eta_max=0.1, T_up=0, gamma=1., last_epoch=-1):
@@ -123,53 +124,75 @@ class ImageProjModel_f(torch.nn.Module):
         return self.net(x)
 
 
-class ImageProjModel_g(torch.nn.Module):
-    """SD model with image prompt"""
-
-    def __init__(self, in_dim, hidden_dim, out_dim, dropout=0.):
-        super().__init__()
-
-        self.net = nn.Sequential(
-            nn.Linear(in_dim, hidden_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, out_dim),
-            nn.Dropout(dropout)
-        )
-
-    def forward(self, x):
-        return self.net(x)
-
-
 class SDModel(torch.nn.Module):
     """SD model with image prompt"""
 
     def __init__(self, unet, args) -> None:
         super().__init__()
         self.args = args
-        self.image_proj_model_s = ImageProjModel_s(in_dim=args.proj_in_dim, hidden_dim=768, out_dim=1024)
-        self.image_proj_model_f = ImageProjModel_f(in_dim=args.proj_in_dim, hidden_dim=768, out_dim=1024)
-        # self.feature_proj_model_s = ImageProjModel_f(in_dim=512, hidden_dim=768, out_dim=768)
+        self.image_proj_model_s = ImageProjModel_s(in_dim=self.args.patch_proj_in_dim, hidden_dim=768, out_dim=1024,
+                                                   dropout=self.args.proj_drop_rate)
+        self.image_proj_model_f = ImageProjModel_f(in_dim=self.args.patch_proj_in_dim, hidden_dim=768, out_dim=1024,
+                                                   dropout=self.args.proj_drop_rate)
+
         self.unet = unet
         self.pose_proj = ControlNetConditioningEmbedding(
             conditioning_embedding_channels=320,
             block_out_channels=(16, 32, 96, 256),
             conditioning_channels=3)
 
+    def _execution_device(self):
+        r"""
+        Returns the device on which the pipeline's models will be executed. After calling
+        `pipeline.enable_sequential_cpu_offload()` the execution device can only be inferred from Accelerate's module
+        hooks.
+        """
+        if not hasattr(self.unet, "_hf_hook"):
+            return self.device
+        for module in self.unet.modules():
+            if (
+                    hasattr(module, "_hf_hook")
+                    and hasattr(module._hf_hook, "execution_device")
+                    and module._hf_hook.execution_device is not None
+            ):
+                return torch.device(module._hf_hook.execution_device)
+        return self.device
+
     def forward(self, noisy_latents, timesteps,
                 cond_src_image_feature, cond_img_patch_feature,
-                cond_attn_patch_feature, pose_f):
-
+                cond_attn_patch_feature, pose_f, phase):
         if self.args.fusion_image_patch_encoder == True:
             extra_patch_embeddings_s = self.image_proj_model_s(cond_img_patch_feature)
-            extra_patch_embeddings_f = self.image_proj_model_f(cond_attn_patch_feature)
-            encoder_image_hidden_states = extra_patch_embeddings_s + extra_patch_embeddings_f
+            if self.args.proj_fusion_image_patch_encoder == True:
+                extra_patch_embeddings_f = self.image_proj_model_f(cond_attn_patch_feature)
+            else:
+                extra_patch_embeddings_f = cond_attn_patch_feature
+            if phase == 'train':
+                if random.random() < self.args.module_drop_rate:
+                    extra_patch_embeddings_s = torch.zeros(extra_patch_embeddings_s.shape).to(self.unet.device)
+                if random.random() < self.args.module_drop_rate:
+                    extra_patch_embeddings_f = torch.zeros(extra_patch_embeddings_f.shape).to(self.unet.device)
+
+            if self.args.proj_embd_concat == True:
+                encoder_image_hidden_states = torch.cat((extra_patch_embeddings_s, extra_patch_embeddings_f), axis =1)
+            else:
+                encoder_image_hidden_states = extra_patch_embeddings_s + extra_patch_embeddings_f
+
         else:
             extra_patch_embeddings_s = self.image_proj_model_s(cond_img_patch_feature)
+            if phase == 'train':
+                if random.random() < self.args.module_drop_rate:
+                    extra_patch_embeddings_s = torch.zeros(extra_patch_embeddings_s.shape).to(self.unet.device)
             encoder_image_hidden_states = extra_patch_embeddings_s
 
-        pose_cond = self.pose_proj(pose_f)
+        if self.args.fusion_image_encoder == True:
+            if phase == 'train':
+                if random.random() < self.args.module_drop_rate:
+                    cond_src_image_feature = torch.zeros(cond_src_image_feature.shape).to(self.unet.device)
+        else:
+            cond_src_image_feature = None
 
+        pose_cond = self.pose_proj(pose_f)
         pred_noise = self.unet(noisy_latents, timesteps, class_labels=cond_src_image_feature,
                                encoder_hidden_states=encoder_image_hidden_states,
                                my_pose_cond=pose_cond).sample
@@ -198,7 +221,7 @@ class FPDM(pl.LightningModule):
         self.vae = AutoencoderKL.from_pretrained(self.hparams.pretrained_model_name_or_path, subfolder="vae")
 
         if self.hparams.fusion_image_encoder == True:
-            self.class_embed_type = "projection"
+            self.class_embed_type = self.hparams.class_embed_type # "projection"
         else:
             self.class_embed_type = None
 
@@ -215,7 +238,10 @@ class FPDM(pl.LightningModule):
         self.fusion_model_attention = self.fusion_model.attention
 
         if self.hparams.init_src_image_encoder:
-            self.src_image_encoder = AutoModel.from_pretrained(self.hparams.src_encoder_path)
+            if self.hparams.src_encoder_type == 'clip':
+                self.src_image_encoder = CLIPVisionModelWithProjection.from_pretrained(self.hparams.src_encoder_path)
+            else:
+                self.src_image_encoder = AutoModel.from_pretrained(self.hparams.src_encoder_path)
         else:
             self.src_image_encoder = self.fusion_model.img_encoder
 
@@ -224,10 +250,8 @@ class FPDM(pl.LightningModule):
                                                              subfolder="scheduler")  # beta_end=0.1)#
 
         self.src_image_encoder.requires_grad_(False)
-        # image_encoder_g.requires_grad_(False)
         self.vae.requires_grad_(False)
         self.fusion_model.requires_grad_(False)
-
         self.fusion_model_img_encoder.requires_grad_(False)
         self.fusion_model_pose_encoder.requires_grad_(False)
         self.fusion_model_combiner.requires_grad_(False)
@@ -281,15 +305,20 @@ class FPDM(pl.LightningModule):
 
     def data_load(self, s_img_path, t_img_path, t_pose_path):
         # load images
-        s_img = Image.open(s_img_path).convert("RGB").resize((self.hparams.img_width, self.hparams.img_height),
+        s_img = Image.open(s_img_path).convert("RGB").resize((self.hparams.img_size),
                                                              Image.BICUBIC)
         if t_img_path:
-            t_img = Image.open(t_img_path).convert("RGB").resize((self.hparams.img_width, self.hparams.img_height),
+            t_img = Image.open(t_img_path).convert("RGB").resize((self.hparams.img_size),
                                                                  Image.BICUBIC)
         else:
             t_img = None
-        t_pose = Image.open(t_pose_path).convert("RGB").resize((self.hparams.img_width, self.hparams.img_height),
+        t_pose = Image.open(t_pose_path).convert("RGB").resize((self.hparams.img_size),
                                                                Image.BICUBIC)
+
+        s_img = s_img.resize(self.hparams.model_img_size, Image.BICUBIC)
+        t_img = t_img.resize(self.hparams.model_img_size, Image.BICUBIC)
+        t_pose = t_pose.resize(self.hparams.model_img_size, Image.BICUBIC)
+
         # preprocessing
         trans_s_img = self.transform(s_img).to(self.dtype).to(self.device).unsqueeze(0)
         if t_img_path:
@@ -297,15 +326,15 @@ class FPDM(pl.LightningModule):
         else:
             trans_t_img = None
         trans_t_pose = self.transform(t_pose).to(self.dtype).to(self.device).unsqueeze(0)
-        processed_s_img = (self.image_processor(images=s_img,
+
+        processed_s_img = (self.image_processor(images=s_img.resize((224, 224)),
                                                 return_tensors="pt").pixel_values).to(self.dtype).to(self.device)
-        processed_t_pose = (self.image_processor(images=t_pose,
+        processed_t_pose = (self.image_processor(images=t_pose.resize((224, 224)),
                                                  return_tensors="pt").pixel_values).to(self.dtype).to(self.device)
         _dict = {"source_image": trans_s_img,
                  "target_image": trans_t_img,
                  "target_pose": trans_t_pose,
                  "processed_source_image": processed_s_img,
-                 # "processed_target_image": processed_t_img,
                  "processed_target_pose": processed_t_pose,
                  }
         return _dict
@@ -365,7 +394,7 @@ class FPDM(pl.LightningModule):
                                    cond_fusion_image_feature,
                                    s_image_patch_embeddings,
                                    cond_attn_patch_embeddings,
-                                   target_pose)
+                                   target_pose, self.hparams.phase)
 
         # Get the target for loss depending on the prediction type
         if self.noise_scheduler.config.prediction_type == "epsilon":
@@ -394,7 +423,6 @@ class FPDM(pl.LightningModule):
         # Get the masked image latents
         cond_src_feature = self.src_image_encoder(processed_source_image)
         s_image_patch_embeddings = (cond_src_feature.last_hidden_state)[:, 1:, :]
-        s_img_proj_f = self.sd_model.image_proj_model_s(s_image_patch_embeddings)
 
         # get fusion embeddings
         embddings_src = self.fusion_model_img_encoder(processed_source_image)
@@ -405,25 +433,37 @@ class FPDM(pl.LightningModule):
         else:
             s_image_embeddings = embddings_src.pooler_output
             t_pose_embeddings = embddings_t_pos.pooler_output
-        kv_s_image_patch_embeddings = embddings_src.last_hidden_state[:, 1:, :]
-        q_t_pose_patch_embeddings = embddings_t_pos.last_hidden_state[:, 1:, :]
 
-        cond_fusion_image_feature = self.fusion_model_combiner(s_image_embeddings,
-                                                               t_pose_embeddings).unsqueeze(1)
+        # image embeddings fusion
+        if self.hparams.fusion_image_encoder:
+            cond_fusion_image_feature = self.fusion_model_combiner(s_image_embeddings,
+                                                                   t_pose_embeddings).unsqueeze(1)
+        else:
+            cond_fusion_image_feature = None
+        # patch embeddings
+        #### src image patch embeddings
+        s_img_proj_f = self.sd_model.image_proj_model_s(s_image_patch_embeddings)
 
-        # cond_attn_patch_embeddings = kv_s_image_patch_embeddings
-        cond_attn_patch_embeddings = self.fusion_model_attention(q_t_pose_patch_embeddings,
-                                                                 kv_s_image_patch_embeddings,
-                                                                 kv_s_image_patch_embeddings)
+        if self.hparams.fusion_image_patch_encoder:
+            ##### pred target image patch embeddings fusion
+            kv_s_image_patch_embeddings = embddings_src.last_hidden_state[:, 1:, :]
+            q_t_pose_patch_embeddings = embddings_t_pos.last_hidden_state[:, 1:, :]
+            cond_attn_patch_embeddings = self.fusion_model_attention(q_t_pose_patch_embeddings,
+                                                                     kv_s_image_patch_embeddings,
+                                                                     kv_s_image_patch_embeddings)
+            if self.hparams.proj_fusion_image_patch_encoder:
+                cond_image_feature_f = self.sd_model.image_proj_model_f(cond_attn_patch_embeddings)
+            else:
+                cond_image_feature_f = cond_attn_patch_embeddings
+        else:
+            cond_image_feature_f = None
 
+        # pose image embedding
         t_pose_f = self.sd_model.pose_proj(target_pose)
-        # t_pose_f = self.sd_model.pose_proj(target_pose)
-        # extra_image_embeddings_s = self.sd_model.image_proj_model_s(simg_f_s)
-        cond_image_feature_f = self.sd_model.image_proj_model_f(cond_attn_patch_embeddings)
 
         output = self.pipe(
-            height=self.hparams.img_height,
-            width=self.hparams.img_width,
+            height=self.hparams.model_img_size[1],
+            width=self.hparams.model_img_size[0],
             guidance_rescale=0.0,
             t_image=target_imgs,
             s_img_proj_f=s_img_proj_f,
@@ -434,7 +474,6 @@ class FPDM(pl.LightningModule):
             guidance_scale=self.hparams.guidance_scale,
             generator=generator,
             num_inference_steps=self.hparams.num_inference_steps,
-            #noise_offset=self.hparams.noise_offset
         )
         return output
 
@@ -450,20 +489,20 @@ class FPDM(pl.LightningModule):
                                    processed_source_image, processed_target_pose)
 
         if mod == 'generation':
-            out_dict['source_image'] = Image.open(s_img_path).convert("RGB").resize(self.hparams.img_eval_size,
+            out_dict['source_image'] = Image.open(s_img_path).convert("RGB").resize(self.hparams.img_size,
                                                                                     Image.BICUBIC)
-            out_dict['target_pose'] = Image.open(t_pose_path).convert("RGB").resize(self.hparams.img_eval_size,
+            out_dict['target_pose'] = Image.open(t_pose_path).convert("RGB").resize(self.hparams.img_size,
                                                                                     Image.BICUBIC)
-            out_dict['generate_images'] = [i.resize(self.hparams.img_eval_size, Image.BICUBIC) for i in output.images]
+            out_dict['generate_images'] = [i.resize(self.hparams.img_size, Image.BICUBIC) for i in output.images]
             return out_dict
 
-        out_dict['source_image'] = Image.open(s_img_path).convert("RGB").resize(self.hparams.img_eval_size,
+        out_dict['source_image'] = Image.open(s_img_path).convert("RGB").resize(self.hparams.img_size,
                                                                                 Image.BICUBIC)
-        out_dict['target_image'] = Image.open(t_img_path).convert("RGB").resize(self.hparams.img_eval_size,
+        out_dict['target_image'] = Image.open(t_img_path).convert("RGB").resize(self.hparams.img_size,
                                                                                 Image.BICUBIC)
-        out_dict['target_pose'] = Image.open(t_pose_path).convert("RGB").resize(self.hparams.img_eval_size,
+        out_dict['target_pose'] = Image.open(t_pose_path).convert("RGB").resize(self.hparams.img_size,
                                                                                 Image.BICUBIC)
-        out_dict['generate_images'] = [i.resize(self.hparams.img_eval_size, Image.BICUBIC) for i in output.images]
+        out_dict['generate_images'] = [i.resize(self.hparams.img_size, Image.BICUBIC) for i in output.images]
 
         if self.hparams.calculate_metrics:
             trans_target = np.expand_dims(np.array(out_dict['target_image']).transpose(2, 0, 1), 0) / 255.
@@ -545,7 +584,7 @@ class FPDM(pl.LightningModule):
             self.logger.log_image(key=f"{mod}_samples", images=[gird_images])
 
     def training_step(self, batch):
-        # source_imgs = batch['source_image']
+        self.hparams.phase = 'train'
         target_imgs = batch['target_image']
         target_pose = batch['target_pose']
         processed_source_image = batch['processed_source_image']
@@ -554,12 +593,12 @@ class FPDM(pl.LightningModule):
                                              target_pose,
                                              processed_source_image,
                                              processed_target_pose)
-        # print(total_loss.mean())
+
         self.log('train_' + "loss", total_loss.mean())
         return total_loss
 
     def validation_step(self, batch):
-        # source_imgs = batch['source_image']
+        self.hparams.phase = 'val'
         target_imgs = batch['target_image']
         target_pose = batch['target_pose']
         processed_source_image = batch['processed_source_image']
@@ -573,10 +612,10 @@ class FPDM(pl.LightningModule):
         return total_loss
 
     def on_train_epoch_end(self):
-        mod = 'train'
-        self.epoch_end_run(mod)
+        self.hparams.phase = 'train'
+        self.epoch_end_run(self.hparams.phase)
 
     def on_validation_epoch_end(self):
-        mod = 'val'
-        self.epoch_end_run(mod)
+        self.hparams.phase = 'val'
+        self.epoch_end_run(self.hparams.phase)
 

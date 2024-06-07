@@ -176,6 +176,7 @@ class FusionModel(pl.LightningModule):
             self.img_encoder = AutoModel.from_pretrained(self.hparams.img_encoder_path)
         if not self.hparams.img_encoder_update:
             self.img_encoder.requires_grad_(False)
+        # self.img_encoder.requires_grad_(False)
         self.pose_encoder = self.img_encoder
         self.attention = AttentionModel(self.hparams.attn_hidden_dim, self.hparams.mh_attn_size)
         self.combiner = Combiner(img_feature_dim=self.hparams.combiner_hidden_dim, projection_dim=768,
@@ -195,8 +196,14 @@ class FusionModel(pl.LightningModule):
         return [optimizer], [lr_scheduler]
 
     def attention_fusion_info_nce_loss(self, img_s_feats, img_t_feats, fushion_feats, mode="train"):
+        if self.hparams.patch_self_learning:
+            img_t_feats = torch.concat((img_t_feats, img_s_feats), axis=0)
+            fushion_feats = torch.concat((fushion_feats, img_s_feats), axis=0)
+            img_s_feats = torch.concat((img_s_feats, img_s_feats), axis=0)
+
         # Calculate cosine similarity
-        cos_sim = F.cosine_similarity(img_t_feats[:, None, :], fushion_feats[None, :, :], dim=-1)
+        cos_sim = F.cosine_similarity(img_t_feats[:, None, :],
+                                      fushion_feats[None, :, :], dim=-1)
         # Mask out cosine similarity to itself
         pos_mask = torch.eye(cos_sim.shape[0], dtype=torch.bool, device=cos_sim.device)
 
@@ -224,6 +231,13 @@ class FusionModel(pl.LightningModule):
 
     def combiner_fusion_info_nce_loss(self, img_s_feats, img_t_feats, fushion_feats, mode="train"):
         # Calculate cosine similarity
+
+        # if conbiner src_f_laerning
+        if self.hparams.conbiner_self_learning:
+            img_t_feats = torch.concat((img_t_feats, img_s_feats), axis=0)
+            fushion_feats = torch.concat((fushion_feats, img_s_feats), axis=0)
+            img_s_feats = torch.concat((img_s_feats, img_s_feats), axis=0)
+
         cos_sim = F.cosine_similarity(img_t_feats[:, None, :], fushion_feats[None, :, :], dim=-1)
         # Mask out cosine similarity to itself
         pos_mask = torch.eye(cos_sim.shape[0], dtype=torch.bool, device=cos_sim.device)
@@ -256,9 +270,39 @@ class FusionModel(pl.LightningModule):
         target_imgs = batch['target_img']
         target_pose = batch['target_pose']
 
-        encoded_source = self.img_encoder(source_imgs)
-        encoded_target = self.img_encoder(target_imgs)
-        encoded_target_pose = self.pose_encoder(target_pose)
+        if self.hparams.learning_encoder_type == 'all':
+            encoded_source = self.img_encoder(source_imgs)
+            encoded_target_pose = self.pose_encoder(target_pose)
+            encoded_target = self.img_encoder(target_imgs)
+
+        elif self.hparams.learning_encoder_type == 'each':
+            if batch_idx % 3 == 0:
+                self.img_encoder.requires_grad_(True)
+                encoded_source = self.img_encoder(source_imgs)
+                self.img_encoder.requires_grad_(False)
+                encoded_target = self.img_encoder(target_imgs)
+                encoded_target_pose = self.pose_encoder(target_pose)
+            if batch_idx % 3 == 1:
+                self.img_encoder.requires_grad_(True)
+                encoded_target_pose = self.pose_encoder(target_pose)
+                self.img_encoder.requires_grad_(False)
+                encoded_source = self.img_encoder(source_imgs)
+                encoded_target = self.img_encoder(target_imgs)
+            if batch_idx % 3 == 2:
+                self.img_encoder.requires_grad_(True)
+                encoded_target = self.img_encoder(target_imgs)
+                self.img_encoder.requires_grad_(False)
+                encoded_source = self.img_encoder(source_imgs)
+                encoded_target_pose = self.pose_encoder(target_pose)
+            self.img_encoder.requires_grad_(True)
+
+        else:
+            print('learn only src and pose grad.')
+            encoded_source = self.img_encoder(source_imgs)
+            encoded_target_pose = self.pose_encoder(target_pose)
+            self.img_encoder.requires_grad_(False)
+            encoded_target = self.img_encoder(target_imgs)
+            self.img_encoder.requires_grad_(True)
 
         if self.hparams.encoder_type == 'clip':
             source_img_feats = encoded_source.image_embeds
@@ -286,8 +330,15 @@ class FusionModel(pl.LightningModule):
             patch_info_ncs_loss = self.attention_fusion_info_nce_loss(source_patch_embeddings[c_rand_idx],
                                                                       target_patch_embeddings[c_rand_idx],
                                                                       fusion_patch_embeddings[c_rand_idx], mode="train")
+
+            # src와 target이 관련이 없는 친구들은 잘 예측되도록 강조
+            # 많이 안바뀌는 친구들은 학습 덜해도됨 (ex. 흰바탕)
+            # loss 측면에서는
+            # cos_sim = F.cosine_similarity(fusion_patch_embeddings[:, None, :].cpu(), target_patch_embeddings[None, :, :].cpu(), dim=-1)
+
         else:
             patch_info_ncs_loss = 0
+
         fusion_img_feats = self.combiner(source_img_feats, target_pose_feats)
         global_info_ncs_loss = self.combiner_fusion_info_nce_loss(source_img_feats,
                                                                   targets_img_feats,

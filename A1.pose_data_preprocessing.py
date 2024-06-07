@@ -65,7 +65,7 @@ def run_preprcessing_market1501(kpt_txts, save_dir):
             os.makedirs(os.path.dirname(pose_image_path), exist_ok=True)
         pos_img.save(pose_image_path, format='JPEG', quality=100)
 
-def run_preprcessing_sign(kpt_txts, save_dir):
+def run_preprcessing_sign(kpt_txts):
     param = {}
     param['offset'] = 0
     param['stickwidth'] = 4
@@ -73,7 +73,7 @@ def run_preprcessing_sign(kpt_txts, save_dir):
     param['anno_height'] = 512
     PK = ProcessingSignKeypoints()
     for i in tqdm.tqdm(range(len(kpt_txts))):
-        pose_image_path = kpt_txts[i].replace('pose', 'pose_img').replace('.txt', '.jpg')
+        pose_image_path = kpt_txts[i].replace('pose', 'pose_c_img').replace('.txt', '.jpg')
         img_path = kpt_txts[i].replace('/pose/', '/img/').replace('txt', 'jpg')
         img = cv2.imread(img_path)
         # h, w, c = img.shape
@@ -85,7 +85,7 @@ def run_preprcessing_sign(kpt_txts, save_dir):
 
 root_dir = 'dataset'
 dataname = 'sign' #; 'market1501' deepfashion
-dataset_type = 'test'
+dataset_type = 'train'
 
 if dataname == 'deepfashion':
     save_dir = 'pose_img'
@@ -109,19 +109,36 @@ elif dataname == 'market1501':
     run_preprcessing_market1501(kpt_txts, save_dir)
 
 elif dataname == 'sign':
-    if not dataset_type == 'test':
-        save_dir = 'five_people/sample_100000/pose_img'
+    if dataset_type == 'train':
+        save_dir = 'five_people/sample_100000/pose_c_img'
         dataset_dir = os.path.join(root_dir, 'multi/five_people/sample_100000')
         save_path = os.path.join(root_dir, 'multi', save_dir)
-    else:
+        if not os.path.exists(save_path):
+            os.mkdir(save_path)
+        kpt_txts = glob.glob(os.path.join(dataset_dir, 'pose/**/*.txt'), recursive=True)
+        run_preprcessing_sign(kpt_txts)
+    elif dataset_type == 'test':
         save_dir = './one_video_test/J/CUSH11632A_A11/pose_img'
         dataset_dir = os.path.join(root_dir, './one_video_test/J/CUSH11632A_A11')
         save_path = os.path.join(root_dir, save_dir)
+        if not os.path.exists(save_path):
+            os.mkdir(save_path)
+        kpt_txts = glob.glob(os.path.join(dataset_dir, 'pose/**/*.txt'), recursive=True)
+        run_preprcessing_sign(kpt_txts)
+    elif dataset_type == 'video':
+        dirs =  f'./{root_dir}/video_test/'
+        dataset_dir_list = glob.glob(dirs+'*')
+        for dataset_dir in dataset_dir_list:
+            save_path = f'{dataset_dir}/pose_img'
+            dataset_dir = dataset_dir
+            if not os.path.exists(save_path):
+                os.mkdir(save_path)
+            kpt_txts = glob.glob(os.path.join(dataset_dir, 'pose/**/*.txt'), recursive=True)
+            run_preprcessing_sign(kpt_txts)
+    else:
+        pass
 
-    if not os.path.exists(save_path):
-        os.mkdir(save_path)
-    kpt_txts = glob.glob(os.path.join(dataset_dir, 'pose/**/*.txt'), recursive=True)
-    run_preprcessing_sign(kpt_txts, save_dir)
+
 else:
     print('wrong data name chose deepfashion or market1501')
 

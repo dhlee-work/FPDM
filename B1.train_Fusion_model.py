@@ -69,7 +69,7 @@ def str2bool(v):
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default='./config/b1.fpdm-sign.yaml', help='Path to config file')
+    parser.add_argument("--config", type=str, default='./config/b1.fpdm-clip-deepfashion-test.yaml', help='Path to config file')
     return parser.parse_args()
 
 args = get_parser()
@@ -77,8 +77,10 @@ config = OmegaConf.load(args.config)
 
 logger, ckpt_cb = load_logger(config)
 train_dataset = read_dataset(config.root_path, config.train_dataset_name)
-# test_dataset = read_dataset(config.root_path, config.test_dataset_name)
-train_dataset, valid_dataset = split_trainset(train_dataset, thr_ratio=config.thr_ratio)
+if  config.thr_ratio == 1:
+    valid_dataset = read_dataset(config.root_path, config.test_dataset_name)
+else:
+    train_dataset, valid_dataset = split_trainset(train_dataset, thr_ratio=config.thr_ratio)
 
 
 config.phase = 'train'

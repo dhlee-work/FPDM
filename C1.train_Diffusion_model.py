@@ -40,7 +40,11 @@ def load_logger(config):
         logger = WandbLogger(name=config.project_name,
                              project=config.project_name,
                              log_model=True,
-                             save_dir=log_dir)
+                             save_dir=log_dir,
+                             # id='wmj6auco',
+                             # resume="allow",
+                             # reinit=True
+                             )
     else:
         logger = None
 
@@ -62,7 +66,8 @@ traindataset = FPDM_Dataset(
     config.train_json_path,
     config.data_root_path,
     phase='train',
-    img_size=(config.img_width, config.img_height),
+    model_img_size=config.model_img_size,
+    img_size=config.img_size,
     src_encoder_path=config.src_encoder_path,
     imgs_drop_rate=config.imgs_drop_rate,
     pose_drop_rate=config.pose_drop_rate,
@@ -80,7 +85,8 @@ testdataset = FPDM_Dataset(
     config.test_json_path,
     config.data_root_path,
     phase='test',
-    img_size=(config.img_width, config.img_height),  # w h
+    model_img_size=config.model_img_size,
+    img_size=config.img_size,  # w h
     src_encoder_path=config.src_encoder_path,
     imgs_drop_rate=0,
     pose_drop_rate=0,

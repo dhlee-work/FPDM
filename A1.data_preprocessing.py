@@ -102,20 +102,48 @@ def reformat_sign_dataset(dataset_dir):
 
     filenames_test = []
     file_txt = '{}/test_pairs.txt'.format(dataset_dir)
-    data = np.loadtxt(file_txt, dtype=str, skiprows=1)
-    dname = dataset_dir.split('/')[-1]
-    for i in data:
-        source = i.split(',')[0].replace(f'./{dname}/','./')
-        target = i.split(',')[1].replace(f'./{dname}/','./')
-        # source = os.path.join('./img', source)
-        # target = os.path.join('./img', target)
-        if not os.path.exists(os.path.join(dataset_dir, source)):
-            print(f'warnning : no such a image {source}')
-        if not os.path.exists(os.path.join(dataset_dir,  target)):
-            print(f'warnning : no such a image {target}')
-        filenames_test.append({'source_image': source,
-                               'target_image': target})
-    return filenames_train, filenames_test
+    if os.path.exists(file_txt):
+        data = np.loadtxt(file_txt, dtype=str, skiprows=1)
+        dname = '/'.join(dataset_dir.split('/')[2:])
+        for i in data:
+            source = i.split(',')[0].replace(f'./{dname}/','./')
+            target = i.split(',')[1].replace(f'./{dname}/','./')
+            # source = os.path.join('./img', source)
+            # target = os.path.join('./img', target)
+            if not os.path.exists(os.path.join(dataset_dir, source)):
+                print(f'warnning : no such a image {source}')
+            if not os.path.exists(os.path.join(dataset_dir,  target)):
+                print(f'warnning : no such a image {target}')
+            filenames_test.append({'source_image': source,
+                                   'target_image': target})
+    else:
+        print('test file is not exists')
+    filenames_annotation = []
+    file_txt = '{}/annotations.txt'.format(dataset_dir)
+    if os.path.exists(file_txt):
+        data = np.loadtxt(file_txt, dtype=str, skiprows=1)
+        dname = '/'.join(dataset_dir.split('/')[2:])
+        target_old = None
+        for idx , i in enumerate(data):
+            if len(data) == (idx-1):
+                continue
+            if idx == 0:
+                source = i.split(',')[0].replace(f'./{dname}/','./')
+            else:
+                source = target_old
+            target = i.split(',')[1].replace(f'./{dname}/','./')
+            target_old = target
+            # source = os.path.join('./img', source)
+            # target = os.path.join('./img', target)
+            if not os.path.exists(os.path.join(dataset_dir, source)):
+                print(f'warnning : no such a image {source}')
+            if not os.path.exists(os.path.join(dataset_dir,  target)):
+                print(f'warnning : no such a image {target}')
+            filenames_annotation.append({'source_image': source,
+                                   'target_image': target})
+    else:
+        print('video file is not exists')
+    return filenames_train, filenames_test, filenames_annotation
 
 
 def omit_image_only(_dataset, type):
@@ -189,16 +217,21 @@ def run_preprcessing_market1501(dataset_dir):
     print('process finished !! ')
 
 def run_preprcessing_sign(dataset_dir):
-    train_dataset, test_dataset = reformat_sign_dataset(dataset_dir)
-    with open(os.path.join(dataset_dir, f'train_pairs_data.json'), 'w') as f:
-        json.dump(train_dataset, f)
-    with open(os.path.join(dataset_dir, f'test_pairs_data.json'), 'w') as f:
-        json.dump(test_dataset, f)
+    train_dataset, test_dataset, video_dataset = reformat_sign_dataset(dataset_dir)
+    if  train_dataset:
+        with open(os.path.join(dataset_dir, f'train_pairs_data.json'), 'w') as f:
+            json.dump(train_dataset, f)
+    if test_dataset:
+        with open(os.path.join(dataset_dir, f'test_pairs_data.json'), 'w') as f:
+            json.dump(test_dataset, f)
+    if video_dataset:
+        with open(os.path.join(dataset_dir, f'video_pairs_data.json'), 'w') as f:
+            json.dump(video_dataset, f)
     print('process finished !! ')
 
 root_dir = './dataset'
-dataset = 'sign' #'market1501' # sign one_video_test
-dataset_type = 'video_test' #'video_test
+dataset = 'deepfashion'# 'sign' #'market1501' # sign one_video_test
+dataset_type = 'train' #'video_test
 resized_dirname = 'resized_img'
 dataset_dir = os.path.join(root_dir, dataset)
 
@@ -208,40 +241,13 @@ elif dataset == 'market1501':
     run_preprcessing_market1501(dataset_dir)
 elif dataset =='sign':
     if dataset_type == 'video_test':
-        dataset_dir = os.path.join(root_dir, 'one_video_test')
+        dataset_dir = os.path.join(root_dir, 'video_test/')
+        dataset_dir_list = glob.glob(dataset_dir+'*')
+        for i in dataset_dir_list:
+            run_preprcessing_sign(i)
     else:
         dataset_dir = os.path.join(root_dir, 'multi')
-    run_preprcessing_sign(dataset_dir)
+        run_preprcessing_sign(dataset_dir)
 
 else:
     print('wrong dataset name')
-
-# dataset_dir = os.path.join(root_dir, 'multi')
-# train_dataset, test_dataset = reformat_sign_dataset(dataset_dir)
-#
-# len_data = np.arange(len(train_dataset))
-# np.random.shuffle(len_data)
-# intr_idx = len_data[:30000]
-# train_dataset = np.array(train_dataset)[intr_idx]
-# train_dataset = list(train_dataset)
-# with open(os.path.join(dataset_dir, f'train_sample_pairs_data.json'), 'w') as f:
-#     json.dump(train_dataset, f)
-#
-# print('annotation preprocessing')
-# image_list = glob.glob(os.path.join(dataset_dir, 'img/**/*.jpg'), recursive=True)
-# train_dataset, test_dataset = reformat_deepfashion_dataset(dataset_dir, image_list)
-# # check if imgs has no pose annotation omit.
-# train_dataset = omit_image_only(train_dataset, 'train')
-# test_dataset = omit_image_only(test_dataset, 'test')
-#
-# len_data = np.arange(len(train_dataset))
-# np.random.shuffle(len_data)
-# intr_idx = len_data[:30000]
-# train_dataset = np.array(train_dataset)[intr_idx]
-# train_dataset = list(train_dataset)
-# with open(os.path.join(dataset_dir, f'train_sample_pairs_data.json'), 'w') as f:
-#     json.dump(train_dataset, f)
-#
-#
-# with open(os.path.join(dataset_dir, f'train_pairs_data.json'), 'w') as f:
-#     json.dump(train_dataset, f)

@@ -1,15 +1,15 @@
-project_name: 'deepfashion-fusion-CLIP-patch-learning'
+project_name: 'deepfashion-fusion-CLIP-b48-r10-p005-lr'
 root_path: './dataset/deepfashion/'
 device: [0]
 phase: 'train'
 disable_logger: false
 mode: 'client'
 port: 52162
-batch_size: 32 #70
+batch_size: 48 #70 # 20
 num_workers: 16
 combiner_hidden_dim: 768  # large 768 base 512
-img_pose_drop_rate: 0.1
-thr_ratio: 0.6
+img_pose_drop_rate: 0.0
+thr_ratio: 1.0
 lr: 0.0
 accumulate_grad_batches: 1
 scheduler_t0: 10
@@ -31,5 +31,8 @@ wandb_id: null
 train_dataset_name: 'train_pairs_data.json'
 test_dataset_name: 'test_pairs_data.json'
 img_encoder_path: 'openai/clip-vit-large-patch14' # 'facebook/dinov2-base' # 'openai/clip-vit-base-patch16'
-train_patch_embeddings: True
-train_patch_embeddings_sampling_ratio: 0.12
+conbiner_self_learning: true
+patch_self_learning: false #
+learning_encoder_type: 'all' # 'each',
+train_patch_embeddings: true
+train_patch_embeddings_sampling_ratio: 0.05 # 0.12 # 0.12 # 0.05

@@ -45,6 +45,24 @@ from diffusers.utils import BaseOutput, logging
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
 
+class ImageProjModel_g(torch.nn.Module):
+    """SD model with image prompt"""
+
+    def __init__(self, in_dim, hidden_dim, out_dim, dropout=0.):
+        super().__init__()
+
+        self.net = nn.Sequential(
+            nn.Linear(in_dim, hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, out_dim),
+            nn.Dropout(dropout)
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+
 @dataclass
 class UNet2DConditionOutput(BaseOutput):
     """
@@ -243,7 +261,9 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
             # When used for embedding actual timesteps, the timesteps are first converted to sinusoidal embeddings.
             # As a result, `TimestepEmbedding` can be passed arbitrary vectors.
             self.class_embedding = TimestepEmbedding(projection_class_embeddings_input_dim, time_embed_dim)
-
+        elif class_embed_type == "mlp":
+            self.class_embedding = ImageProjModel_g(in_dim=projection_class_embeddings_input_dim, hidden_dim=768,
+                                                    out_dim=time_embed_dim, dropout=0.2)
         elif class_embed_type == "simple_projection":
             if projection_class_embeddings_input_dim is None:
                 raise ValueError(
@@ -692,13 +712,13 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
                 class_labels = class_labels.to(dtype=sample.dtype)
 
             class_labels = class_labels.squeeze(1)
-            # print(class_labels.shape)
             class_emb = self.class_embedding(class_labels).to(dtype=sample.dtype)
 
             if self.config.class_embeddings_concat:
                 emb = torch.cat([emb, class_emb], dim=-1)
             else:
                 emb = emb + class_emb
+
 
         if self.config.addition_embed_type == "text":
             aug_emb = self.add_embedding(encoder_hidden_states)

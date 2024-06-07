@@ -45,6 +45,7 @@ class FPDM_Dataset(Dataset):
             image_root_path,
             phase='train',
             src_encoder_path=None,
+            model_img_size=(512, 512),
             img_size=(512, 512),
             imgs_drop_rate=0.0,
             pose_drop_rate=0.0,
@@ -57,7 +58,7 @@ class FPDM_Dataset(Dataset):
 
         self.phase = phase
         self.img_size = img_size
-
+        self.model_img_size = model_img_size
         self.imgs_drop_rate = imgs_drop_rate
         self.pose_drop_rate = pose_drop_rate
         self.src_encoder_path = src_encoder_path
@@ -77,18 +78,15 @@ class FPDM_Dataset(Dataset):
 
     def transforms(self, source_img, target_img, pos_t_img):
         # Random crop
-        # if random.random() < 0.5:
-        crop = transforms.RandomResizedCrop(self.img_size)
-        params = crop.get_params(source_img, scale=(0.8, 1.1), ratio=(0.75, 1.33))
-        source_img = transforms.functional.crop(source_img, *params)
-        source_img = transforms.functional.resize(source_img, crop.size[::-1])
-
-        # params = crop.get_params(target_img, scale=(0.8, 1.1), ratio=(0.75, 1.33))
-        target_img = transforms.functional.crop(target_img, *params)
-        target_img = transforms.functional.resize(target_img, crop.size[::-1])
-
-        pos_t_img = transforms.functional.crop(pos_t_img, *params)
-        pos_t_img = transforms.functional.resize(pos_t_img, crop.size[::-1])
+        if random.random() < 0.0:
+            crop = transforms.RandomResizedCrop(self.img_size)
+            params = crop.get_params(source_img, scale=(0.5, 1), ratio=(0.75, 1.33))
+            source_img = transforms.functional.crop(source_img, *params)
+            source_img = transforms.functional.resize(source_img, crop.size[::-1])
+            target_img = transforms.functional.crop(target_img, *params)
+            target_img = transforms.functional.resize(target_img, crop.size[::-1])
+            pos_t_img = transforms.functional.crop(pos_t_img, *params)
+            pos_t_img = transforms.functional.resize(pos_t_img, crop.size[::-1])
 
         # Random horizontal flipping
         if random.random() < 0.0:
@@ -123,6 +121,10 @@ class FPDM_Dataset(Dataset):
 
         t_pose = Image.open(t_img_path.replace("/img/", "/pose_img/")).resize(
             self.img_size, Image.BICUBIC)
+
+        s_img = s_img.resize(self.model_img_size, Image.BICUBIC)
+        t_img = t_img.resize(self.model_img_size, Image.BICUBIC)
+        t_pose = t_pose.resize(self.model_img_size, Image.BICUBIC)
 
         # if self.args.phase == 'train':
         if self.phase == 'train':

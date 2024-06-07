@@ -6,6 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 from src.fusion.dataset import FusionDataset
 from src.fusion.models import FusionModel
+from transformers import CLIPVisionModelWithProjection
 # param = {}
 # param['scale_size'] = (256, 256)
 # param['crop_param'] = (256, 256, 0, 0)
@@ -35,17 +36,17 @@ def read_dataset(root_path, filename):
 from transformers import AutoImageProcessor, AutoModel
 from PIL import Image
 import requests
-
-url = 'http://images.cocodataset.org/val2017/000000039769.jpg'
-image = Image.open(requests.get(url, stream=True).raw)
-
-processor = AutoImageProcessor.from_pretrained('facebook/dinov2-base')
-model = AutoModel.from_pretrained('facebook/dinov2-base')
-
-inputs = processor(images=image, return_tensors="pt")
-inputs['pixel_values'] = torch.zeros_like(inputs['pixel_values'])
-outputs = model(**inputs)
-last_hidden_states = outputs.last_hidden_state
+#
+# url = 'http://images.cocodataset.org/val2017/000000039769.jpg'
+# image = Image.open(requests.get(url, stream=True).raw)
+#
+# processor = AutoImageProcessor.from_pretrained('facebook/dinov2-base')
+# model = AutoModel.from_pretrained('facebook/dinov2-base')
+#
+# inputs = processor(images=image, return_tensors="pt")
+# inputs['pixel_values'] = torch.zeros_like(inputs['pixel_values'])
+# outputs = model(**inputs)
+# last_hidden_states = outputs.last_hidden_state
 
 #
 #
@@ -66,12 +67,12 @@ contrastive learning
 # img = plt.imread(img_list[3])
 # plt.imshow(img[40:54,190:204,:]);plt.show()
 
-x = np.linspace(-0.5, 0.5, 100)
-y = 1 / (1 + np.exp(50 * (0.01 - x)))
-plt.plot(x, y, color='blue')
-plt.vlines(0.1, 0, 1, color='black')
-plt.grid()
-plt.show()
+# x = np.linspace(-0.5, 0.5, 100)
+# y = 1 / (1 + np.exp(50 * (0.01 - x)))
+# plt.plot(x, y, color='blue')
+# plt.vlines(0.1, 0, 1, color='black')
+# plt.grid()
+# plt.show()
 
 
 def get_parser():
@@ -98,12 +99,14 @@ def get_parser():
 
 args = get_parser()
 args.batch_size = 8
-args.num_workers = 8
+args.num_workers = 0
 args.combiner_hidden_dim = 768
+args.hidden_dim = 1024
 args.lr = 1e-5
 args.temperature = 0.07  # 0.07
 args.weight_decay = 1e-4
 args.max_epochs = 100
+args.img_size = (176, 256)
 args.scale_size = (256, 256)
 args.lambda_l1 = 0.00001
 args.encoder_type = 'clip'
@@ -112,12 +115,12 @@ args.mh_attn_size = 8
 
 args.trained_model_name = None  #
 args.wandb_id = None  # '.....'
-args.train_dataset_name = 'train_pairs_data.json'
+args.train_dataset_name = 'train_sample_pairs_data.json'
 args.test_dataset_name = 'test_pairs_data.json'
-args.img_encoder_path = 'openai/clip-vit-large-patch14'
+args.img_encoder_path = 'openai/clip-vit-large-patch14' # 'openai/clip-vit-base-patch16' # 'openai/clip-vit-large-patch14' # 'facebook/dinov2-base'
 args.train_patch_embeddings = True
 args.train_patch_embeddings_sampling_ratio = 0.05
-
+args.img_pose_drop_rate = 0
 # if args.trained_model_name:
 #     run_id = args.trained_model_name.split('-')[-1]
 #     wandb.init(id=run_id, resume="allow")
@@ -135,24 +138,30 @@ train_dataloader = DataLoader(train_dataset,
                               drop_last=False,
                               pin_memory=True)
 
+args.phase = 'test'
 test_dataset = FusionDataset(test_dataset, args)
 test_dataloader = DataLoader(test_dataset,
                              num_workers=args.num_workers,
                              batch_size=args.batch_size,
-                             shuffle=False,
+                             shuffle=True,
                              drop_last=False,
                              pin_memory=True)
 
-fusion_model = FusionModel.load_from_checkpoint(
-    './logs/deepfashion-fusion-CLIP-patch-learning-wd/2024-05-17T00-20-15/last.ckpt')
+fusion_model = FusionModel.load_from_checkpoint('./logs/deepfashion-fusion-CLIP-b48-r10-p005/2024-06-07T09-32-43/last.ckpt')
+    # './logs/deepfashion-fusion-CLIP-patch-learning-b48/2024-05-31T10-43-40/last.ckpt')
+#  deepfashion-fusion-CLIP-b48-r10-p005/2024-06-07T09-32-43
+# deepfashion-fusion-CLIP-patch-learning-b48-notrans-self/2024-06-02T05-22-43
+# fusion_model.img_encoder = CLIPVisionModelWithProjection.from_pretrained('openai/clip-vit-large-patch14').to(fusion_model.device)
 fusion_model.eval()
 
+
+
 # fusion model load
-fusion_model_img_encoder = fusion_model.img_encoder
-fusion_model_pose_encoder = fusion_model.pose_encoder
+# fusion_model_img_encoder = fusion_model.img_encoder
+# fusion_model_pose_encoder = fusion_model.pose_encoder
 fusion_model_combiner = fusion_model.combiner
 fusion_model_attention = fusion_model.attention
-src_image_encoder = fusion_model.img_encoder
+# src_image_encoder = fusion_model.img_encoder
 
 s_img_features = None
 t_img_features = None
@@ -185,20 +194,22 @@ with torch.no_grad():
         _t_pose_h = _t_pose_e.last_hidden_state[:, 1:, :]
         _t_img_h = _t_img_e.last_hidden_state[:, 1:, :]
 
-        _attn_h = fusion_model_attention(_t_pose_h, _s_img_h, _s_img_h)
+        _attn_h = fusion_model.attention(_t_pose_h, _s_img_h, _s_img_h)
         _fusion_f = fusion_model.combiner(_s_img_f, _t_pose_f)
 
         _fusion_f = _fusion_f.detach().cpu().numpy()
         _s_img_f = _s_img_f.detach().cpu().numpy()
         _t_pose_f = _t_pose_f.detach().cpu().numpy()
         _t_img_f = _t_img_f.detach().cpu().numpy()
+        # break
 
-        random_idx = [np.random.choice(196) for i in range(8)]
 
-        _s_img_h = _s_img_h[:, random_idx, :].detach().cpu().numpy().reshape(-1, 768)
-        _t_pose_h = _t_pose_h[:, random_idx, :].detach().cpu().numpy().reshape(-1, 768)
-        _t_img_h = _t_img_h[:, random_idx, :].detach().cpu().numpy().reshape(-1, 768)
-        _attn_h = _attn_h[:, random_idx, :].detach().cpu().numpy().reshape(-1, 768)
+        random_idx = [np.random.choice(256) for i in range(8)]
+
+        _s_img_h = _s_img_h[:, random_idx, :].detach().cpu().numpy().reshape(-1, args.hidden_dim)
+        _t_pose_h = _t_pose_h[:, random_idx, :].detach().cpu().numpy().reshape(-1, args.hidden_dim)
+        _t_img_h = _t_img_h[:, random_idx, :].detach().cpu().numpy().reshape(-1, args.hidden_dim)
+        _attn_h = _attn_h[:, random_idx, :].detach().cpu().numpy().reshape(-1, args.hidden_dim)
 
         # _path = batch['path']
         if s_img_p_features is None:
@@ -246,10 +257,10 @@ with torch.no_grad():
 
 idx = np.arange(len(s_img_features))
 np.random.shuffle(idx)
-aa = np.array(cosinesim(s_img_features, s_img_features[idx]))
-plt.hist(aa, bins=15, alpha=0.8)
+dd = np.array(cosinesim(s_img_features, s_img_features[idx]))
+plt.hist(dd, bins=15, alpha=0.8)
 plt.show()
-np.mean(aa)
+np.mean(dd)
 
 aa = np.array(cosinesim(s_img_features, t_img_features))
 bb = np.array(cosinesim(t_pose_features, t_img_features))
@@ -263,25 +274,33 @@ plt.xlim(0, 1)
 plt.ylim(0, 1)
 plt.show()
 
-plt.hist(aa, bins=15, alpha=0.8)
-plt.hist(bb, alpha=0.5)
-plt.hist(cc, bins=15, alpha=0.8)
-plt.show()
-np.mean(aa)
-np.mean(bb)
-np.mean(cc)
 
-idx = np.arange(len(s_img_p_features))
-np.random.shuffle(idx)
-aa = np.array(cosinesim(s_img_p_features, s_img_p_features[idx]))
-plt.hist(aa, bins=15, alpha=0.8)
-plt.show()
-np.mean(aa)
+
+# plt.hist(aa, bins=15, alpha=0.8)
+# # plt.hist(bb, alpha=0.5)
+# plt.hist(cc, bins=15, alpha=0.8)
+# plt.hist(dd, bins=15, alpha=0.8)
+# plt.show()
+#
+# np.mean(aa)
+# np.mean(bb)
+# np.mean(cc)
+# np.mean(dd)
+#
+#
 
 aa = np.array(cosinesim(s_img_p_features, t_img_p_features))
 bb = np.array(cosinesim(t_pose_p_features, t_img_p_features))
 cc = np.array(cosinesim(fusion_p_features, t_img_p_features))
 xx = np.linspace(0, 1, 100)
+#
+#
+idx = np.arange(len(fusion_p_features))
+np.random.shuffle(idx)
+dd = np.array(cosinesim(fusion_p_features, fusion_p_features[idx]))
+# plt.hist(dd, bins=15, alpha=0.8)
+# plt.show()
+
 
 plt.scatter(aa, cc, alpha=0.1, c='orange')
 # plt.scatter(cc, bb, alpha=0.4, c='blue')
@@ -291,8 +310,9 @@ plt.ylim(0, 1)
 plt.show()
 
 plt.hist(aa, bins=15, alpha=0.8)
-plt.hist(bb, alpha=0.5)
+# plt.hist(bb, alpha=0.5)
 plt.hist(cc, bins=15, alpha=0.8)
+plt.hist(dd, bins=15, alpha=0.8)
 plt.show()
 np.mean(aa)
 np.mean(bb)
@@ -330,3 +350,80 @@ plt.show()
 
 a = np.array(cosinesim(s_img_features, t_img_features))
 b = np.array(cosinesim(fusion_features, t_img_features))
+
+
+
+
+
+
+from sklearn.datasets import load_digits
+from sklearn.manifold import TSNE
+# import seaborn as sns
+from matplotlib import pyplot as plt
+
+_s_img_h.shape
+_s_img_h = _s_img_h[:, :, :].detach().cpu().numpy()
+_t_pose_h = _t_pose_h[:, :, :].detach().cpu().numpy()
+_t_img_h = _t_img_h[:, :, :].detach().cpu().numpy()
+_attn_h = _attn_h[:, :, :].detach().cpu().numpy()
+
+_t_img_h[0]
+_attn_h[0]
+
+np.mean(cosinesim(_attn_h[1], _attn_h[1]))
+
+np.mean(cosinesim(_s_img_h[2], _attn_h[2]))
+np.mean(cosinesim(_t_img_h[2], _attn_h[2]))
+np.mean(cosinesim(_t_img_h[2], _s_img_h[2]))
+
+
+_img = t_image[3].cpu().numpy().transpose(1,2,0)
+plt.imshow(_img)
+plt.show()
+
+# idx = np.arange(len(_t_img_h[1]))
+# np.random.shuffle(idx)
+# dd = np.array(cosinesim(_t_img_h[1], _t_img_h[1][idx]))
+# plt.hist(dd, bins=15, alpha=0.8)
+# plt.show()
+
+
+# from sklearn.cluster import KMeans
+#
+# kmeans = KMeans(n_clusters=4, random_state=7)
+# kmeans.fit(_s_img_h[1])
+# _cluster = kmeans.labels_
+# _cluster.reshape(16,16)
+
+# _img = t_image[7].cpu().numpy().transpose(1,2,0)
+# plt.imshow(_img)
+# plt.show()
+
+# 축소한 차원의 수를 정합니다.
+n_components = 2
+# TSNE 모델의 인스턴스를 만듭니다.
+model = TSNE(n_components=n_components, perplexity=10)
+# data를 가지고 TSNE 모델을 훈련(적용) 합니다.
+X_embedded = model.fit_transform(_attn_h[3].reshape(-1, 1024)) #
+# 훈련된(차원 축소된) 데이터의 첫번째 값을 출력해 봅니다.
+print(X_embedded[0])
+# [65.49378 -7.3817754]
+
+aaa = np.arange(16).reshape(4, 4)
+aaa = aaa.repeat(4, 0).repeat(4, 1)
+bbb = aaa.reshape(-1)
+
+# aaa = np.arange(4).reshape(2,2)
+# aaa = aaa.repeat(8, 0).repeat(8, 1)
+# bbb = aaa.reshape(-1)
+
+plt.scatter(X_embedded[:, 0], X_embedded[:, 1], marker='.', c=bbb, label =bbb)
+# plt.legend()
+plt.show()
+
+
+
+kmeans = KMeans(n_clusters=5, random_state=7)
+kmeans.fit(X_embedded)
+_cluster = kmeans.labels_
+_cluster.reshape(16,16)

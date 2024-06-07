@@ -7,6 +7,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 from transformers import AutoImageProcessor
 import torch
+import matplotlib.pyplot as plt
 
 class FusionDataset(Dataset):
     def __init__(self, data, args):
@@ -15,7 +16,8 @@ class FusionDataset(Dataset):
         # self.PK_module = ProcessingKeypoints()
         self.image_processor = AutoImageProcessor.from_pretrained(self.args.img_encoder_path)  # 앞으로 빼기
         self.image_processor.size['shortest_edge'] = 224
-
+        # self.image_processor.image_mean = [0.5, 0.5, 0.5]
+        # self.image_processor.image_std = [0.5, 0.5, 0.5]
         self.ColorJitter_functions = {0: transforms.functional.adjust_brightness,
                                       1: transforms.functional.adjust_contrast,
                                       2: transforms.functional.adjust_saturation,
@@ -26,18 +28,18 @@ class FusionDataset(Dataset):
 
     def transforms(self, source_img, target_img, pos_t_img):
         # Random crop
-        # if random.random() < 0.5:
-        crop = transforms.RandomResizedCrop(self.args.img_size)
-        params = crop.get_params(source_img, scale=(0.8, 1.1), ratio=(0.75, 1.33))
-        source_img = transforms.functional.crop(source_img, *params)
-        source_img = transforms.functional.resize(source_img, crop.size[::-1])
+        if random.random() < 0.0:
+            crop = transforms.RandomResizedCrop(self.args.img_size)
+            params = crop.get_params(source_img, scale=(0.5, 1.0), ratio=(0.75, 1.33))
+            source_img = transforms.functional.crop(source_img, *params)
+            source_img = transforms.functional.resize(source_img, crop.size[::-1])
 
-        # params = crop.get_params(source_img, scale=(0.8, 1.1), ratio=(0.75, 1.33))
-        target_img = transforms.functional.crop(target_img, *params)
-        target_img = transforms.functional.resize(target_img, crop.size[::-1])
+            # params = crop.get_params(source_img, scale=(0.8, 1.1), ratio=(0.75, 1.33))
+            target_img = transforms.functional.crop(target_img, *params)
+            target_img = transforms.functional.resize(target_img, crop.size[::-1])
 
-        pos_t_img = transforms.functional.crop(pos_t_img, *params)
-        pos_t_img = transforms.functional.resize(pos_t_img, crop.size[::-1])
+            pos_t_img = transforms.functional.crop(pos_t_img, *params)
+            pos_t_img = transforms.functional.resize(pos_t_img, crop.size[::-1])
 
         # Random horizontal flipping
         if random.random() < 0.0:
@@ -55,7 +57,7 @@ class FusionDataset(Dataset):
                 source_img = self.ColorJitter_functions[i](source_img, params[i + 1])
                 target_img = self.ColorJitter_functions[i](target_img, params[i + 1])
 
-        if random.random() < 0.1:  # 0.2
+        if random.random() < 0.2:  # 0.2
             target_img = transforms.functional.rgb_to_grayscale(target_img, num_output_channels=3)
             source_img = transforms.functional.rgb_to_grayscale(source_img, num_output_channels=3)
 
