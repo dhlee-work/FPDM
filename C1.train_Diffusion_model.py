@@ -27,7 +27,7 @@ def str2bool(v):
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default='./config/c1.fpdm-clip-deepfashion.yaml', help='Path to config file')
+    parser.add_argument("--config", type=str, default='./config/c1.fpdm-clip-deepfashion-test.yaml', help='Path to config file')
     return parser.parse_args()
 
 
@@ -41,7 +41,7 @@ def load_logger(config):
                              project=config.project_name,
                              log_model=True,
                              save_dir=log_dir,
-                             # id='wmj6auco',
+                             # id='i9dx3xud',  #'6kfds9ra',
                              # resume="allow",
                              # reinit=True
                              )
@@ -69,8 +69,8 @@ traindataset = FPDM_Dataset(
     model_img_size=config.model_img_size,
     img_size=config.img_size,
     src_encoder_path=config.src_encoder_path,
-    imgs_drop_rate=config.imgs_drop_rate,
     pose_drop_rate=config.pose_drop_rate,
+    pose_erase_rate=config.pose_erase_rate
 )
 
 train_dataloader = DataLoader(traindataset,
@@ -88,8 +88,8 @@ testdataset = FPDM_Dataset(
     model_img_size=config.model_img_size,
     img_size=config.img_size,  # w h
     src_encoder_path=config.src_encoder_path,
-    imgs_drop_rate=0,
     pose_drop_rate=0,
+    pose_erase_rate=0
 )
 
 test_dataloader = DataLoader(

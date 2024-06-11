@@ -7,7 +7,7 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.checkpoint
-from PIL import Image
+from PIL import Image, ImageEnhance
 from diffusers import (
     AutoencoderKL,
     DDPMScheduler,
@@ -29,7 +29,7 @@ from transformers import CLIPVisionModelWithProjection
 import math
 from torch.optim.lr_scheduler import LRScheduler
 import random
-
+import matplotlib.pyplot as plt
 class CosineAnnealingWarmUpRestarts(LRScheduler):
     def __init__(self, optimizer, T_0, T_mult=1, eta_max=0.1, T_up=0, gamma=1., last_epoch=-1):
         if T_0 <= 0 or not isinstance(T_0, int):
@@ -178,6 +178,12 @@ class SDModel(torch.nn.Module):
             else:
                 encoder_image_hidden_states = extra_patch_embeddings_s + extra_patch_embeddings_f
 
+            if phase == 'train':
+                batch_size = encoder_image_hidden_states.shape[0]
+                embed_size = encoder_image_hidden_states.shape[1]
+                for _i in range(batch_size):
+                    drop_idx = np.random.choice(embed_size, int(embed_size*self.args.embedded_drop_rate))
+                    encoder_image_hidden_states[_i,drop_idx,:] = 0
         else:
             extra_patch_embeddings_s = self.image_proj_model_s(cond_img_patch_feature)
             if phase == 'train':
@@ -193,6 +199,10 @@ class SDModel(torch.nn.Module):
             cond_src_image_feature = None
 
         pose_cond = self.pose_proj(pose_f)
+
+        if self.args.pose_module_drop == True:
+            pose_cond = torch.zeros(pose_cond.shape).to(self.unet.device)
+
         pred_noise = self.unet(noisy_latents, timesteps, class_labels=cond_src_image_feature,
                                encoder_hidden_states=encoder_image_hidden_states,
                                my_pose_cond=pose_cond).sample
@@ -267,11 +277,9 @@ class FPDM(pl.LightningModule):
         self.pipe.enable_xformers_memory_efficient_attention()
 
         self.image_processor = AutoImageProcessor.from_pretrained(self.hparams.src_encoder_path)  # 앞으로 빼기
-        self.transform = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Normalize([0.5], [0.5]), ]
-        )
+
+        self.transform_totensor = transforms.ToTensor()
+        self.transform_normalize = transforms.Normalize([0.5], [0.5])
 
         self.fid = FID()
         self.lpips_obj = LPIPS()
@@ -285,11 +293,13 @@ class FPDM(pl.LightningModule):
         #     optimizer, T_max=self.hparams.max_epochs,
         #     eta_min=self.hparams.lr * 0.001
         # )
-        lr_scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=self.hparams.scheduler_t0,
-                                                     T_mult=self.hparams.scheduler_t_mult ,
-                                                     eta_max=self.hparams.scheduler_eta_max,
-                                                     T_up=self.hparams.scheduler_t_up,
-                                                     gamma= self.hparams.scheduler_gamma)
+        lr_scheduler = optim.lr_scheduler.StepLR(
+            optimizer, step_size=self.hparams.step_size, scheduler_gamma=self.hparams.scheduler_gamma)
+        # lr_scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=self.hparams.scheduler_t0,
+        #                                              T_mult=self.hparams.scheduler_t_mult ,
+        #                                              eta_max=self.hparams.scheduler_eta_max,
+        #                                              T_up=self.hparams.scheduler_t_up,
+        #                                              gamma= self.hparams.scheduler_gamma)
         return [optimizer], [lr_scheduler]
 
     def image_grid(self, imgs, rows, cols):
@@ -314,18 +324,23 @@ class FPDM(pl.LightningModule):
             t_img = None
         t_pose = Image.open(t_pose_path).convert("RGB").resize((self.hparams.img_size),
                                                                Image.BICUBIC)
+        # enhancer = ImageEnhance.Brightness(s_img)
+        # s_img = enhancer.enhance(1.5)
 
         s_img = s_img.resize(self.hparams.model_img_size, Image.BICUBIC)
         t_img = t_img.resize(self.hparams.model_img_size, Image.BICUBIC)
         t_pose = t_pose.resize(self.hparams.model_img_size, Image.BICUBIC)
 
         # preprocessing
-        trans_s_img = self.transform(s_img).to(self.dtype).to(self.device).unsqueeze(0)
+        trans_s_img = self.transform_totensor(s_img)
+        trans_s_img = self.transform_normalize(trans_s_img).to(self.dtype).to(self.device).unsqueeze(0)
         if t_img_path:
-            trans_t_img = self.transform(t_img).to(self.dtype).to(self.device).unsqueeze(0)
+            trans_t_img = self.transform_totensor(t_img)
+            trans_t_img = self.transform_normalize(trans_t_img).to(self.dtype).to(self.device).unsqueeze(0)
         else:
             trans_t_img = None
-        trans_t_pose = self.transform(t_pose).to(self.dtype).to(self.device).unsqueeze(0)
+        # trans_t_pose = self.transform(t_pose).to(self.dtype).to(self.device).unsqueeze(0)
+        trans_t_pose = self.transform_totensor(t_pose).to(self.dtype).to(self.device).unsqueeze(0)
 
         processed_s_img = (self.image_processor(images=s_img.resize((224, 224)),
                                                 return_tensors="pt").pixel_values).to(self.dtype).to(self.device)
@@ -460,6 +475,8 @@ class FPDM(pl.LightningModule):
 
         # pose image embedding
         t_pose_f = self.sd_model.pose_proj(target_pose)
+        if self.hparams.pose_module_drop == True:
+            t_pose_f = torch.zeros(t_pose_f.shape).to(self.unet.device)
 
         output = self.pipe(
             height=self.hparams.model_img_size[1],

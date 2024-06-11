@@ -143,11 +143,11 @@ test_dataset = FusionDataset(test_dataset, args)
 test_dataloader = DataLoader(test_dataset,
                              num_workers=args.num_workers,
                              batch_size=args.batch_size,
-                             shuffle=True,
+                             shuffle=False,
                              drop_last=False,
                              pin_memory=True)
 
-fusion_model = FusionModel.load_from_checkpoint('./logs/deepfashion-fusion-CLIP-b48-r10-p005/2024-06-07T09-32-43/last.ckpt')
+fusion_model = FusionModel.load_from_checkpoint('./logs/deepfashion-fusion-CLIP-b48-p005-r03-epoch3-lr1e-5-wd1e-4/2024-06-10T05-03-40/last.ckpt')
     # './logs/deepfashion-fusion-CLIP-patch-learning-b48/2024-05-31T10-43-40/last.ckpt')
 #  deepfashion-fusion-CLIP-b48-r10-p005/2024-06-07T09-32-43
 # deepfashion-fusion-CLIP-patch-learning-b48-notrans-self/2024-06-02T05-22-43
@@ -258,9 +258,6 @@ with torch.no_grad():
 idx = np.arange(len(s_img_features))
 np.random.shuffle(idx)
 dd = np.array(cosinesim(s_img_features, s_img_features[idx]))
-plt.hist(dd, bins=15, alpha=0.8)
-plt.show()
-np.mean(dd)
 
 aa = np.array(cosinesim(s_img_features, t_img_features))
 bb = np.array(cosinesim(t_pose_features, t_img_features))
@@ -274,18 +271,16 @@ plt.xlim(0, 1)
 plt.ylim(0, 1)
 plt.show()
 
+plt.hist(aa, bins=15, alpha=0.8)
+# plt.hist(bb, alpha=0.5)
+plt.hist(cc, bins=15, alpha=0.8)
+plt.hist(dd, bins=15, alpha=0.8)
+plt.show()
 
-
-# plt.hist(aa, bins=15, alpha=0.8)
-# # plt.hist(bb, alpha=0.5)
-# plt.hist(cc, bins=15, alpha=0.8)
-# plt.hist(dd, bins=15, alpha=0.8)
-# plt.show()
-#
-# np.mean(aa)
-# np.mean(bb)
-# np.mean(cc)
-# np.mean(dd)
+np.mean(aa)
+np.mean(bb)
+np.mean(cc)
+np.mean(dd)
 #
 #
 
@@ -361,6 +356,36 @@ from sklearn.manifold import TSNE
 # import seaborn as sns
 from matplotlib import pyplot as plt
 
+
+idx = 0
+with torch.no_grad():
+    for batch in iter(test_dataloader):
+        s_image = batch['source_img'].cuda()
+        t_image = batch['target_img'].cuda()
+        t_pose = batch['target_pose'].cuda()
+
+        _s_img_e = fusion_model.img_encoder(s_image)
+        _t_pose_e = fusion_model.img_encoder(t_pose)
+        _t_img_e = fusion_model.img_encoder(t_image)
+
+        _s_img_f = _s_img_e.image_embeds
+        _t_pose_f = _t_pose_e.image_embeds
+        _t_img_f = _t_img_e.image_embeds
+
+        _s_img_h = _s_img_e.last_hidden_state[:, 1:, :]
+        _t_pose_h = _t_pose_e.last_hidden_state[:, 1:, :]
+        _t_img_h = _t_img_e.last_hidden_state[:, 1:, :]
+
+        _attn_h = fusion_model.attention(_t_pose_h, _s_img_h, _s_img_h)
+        _fusion_f = fusion_model.combiner(_s_img_f, _t_pose_f)
+
+        _fusion_f = _fusion_f.detach().cpu().numpy()
+        _s_img_f = _s_img_f.detach().cpu().numpy()
+        _t_pose_f = _t_pose_f.detach().cpu().numpy()
+        _t_img_f = _t_img_f.detach().cpu().numpy()
+        break
+
+
 _s_img_h.shape
 _s_img_h = _s_img_h[:, :, :].detach().cpu().numpy()
 _t_pose_h = _t_pose_h[:, :, :].detach().cpu().numpy()
@@ -377,45 +402,23 @@ np.mean(cosinesim(_t_img_h[2], _attn_h[2]))
 np.mean(cosinesim(_t_img_h[2], _s_img_h[2]))
 
 
-_img = t_image[3].cpu().numpy().transpose(1,2,0)
-plt.imshow(_img)
-plt.show()
-
-# idx = np.arange(len(_t_img_h[1]))
-# np.random.shuffle(idx)
-# dd = np.array(cosinesim(_t_img_h[1], _t_img_h[1][idx]))
-# plt.hist(dd, bins=15, alpha=0.8)
-# plt.show()
-
-
-# from sklearn.cluster import KMeans
-#
-# kmeans = KMeans(n_clusters=4, random_state=7)
-# kmeans.fit(_s_img_h[1])
-# _cluster = kmeans.labels_
-# _cluster.reshape(16,16)
-
-# _img = t_image[7].cpu().numpy().transpose(1,2,0)
+# _img = t_image[3].cpu().numpy().transpose(1,2,0)
 # plt.imshow(_img)
 # plt.show()
 
 # 축소한 차원의 수를 정합니다.
 n_components = 2
 # TSNE 모델의 인스턴스를 만듭니다.
-model = TSNE(n_components=n_components, perplexity=10)
+model = TSNE(n_components=n_components, perplexity=20)
 # data를 가지고 TSNE 모델을 훈련(적용) 합니다.
-X_embedded = model.fit_transform(_attn_h[3].reshape(-1, 1024)) #
+X_embedded = model.fit_transform(_attn_h[2].reshape(-1, 1024)) #
 # 훈련된(차원 축소된) 데이터의 첫번째 값을 출력해 봅니다.
-print(X_embedded[0])
+# print(X_embedded[0])
 # [65.49378 -7.3817754]
 
 aaa = np.arange(16).reshape(4, 4)
 aaa = aaa.repeat(4, 0).repeat(4, 1)
 bbb = aaa.reshape(-1)
-
-# aaa = np.arange(4).reshape(2,2)
-# aaa = aaa.repeat(8, 0).repeat(8, 1)
-# bbb = aaa.reshape(-1)
 
 plt.scatter(X_embedded[:, 0], X_embedded[:, 1], marker='.', c=bbb, label =bbb)
 # plt.legend()
@@ -423,7 +426,9 @@ plt.show()
 
 
 
-kmeans = KMeans(n_clusters=5, random_state=7)
-kmeans.fit(X_embedded)
+from sklearn.cluster import KMeans
+
+kmeans = KMeans(n_clusters=4, random_state=7)
+kmeans.fit(_attn_h[1])
 _cluster = kmeans.labels_
 _cluster.reshape(16,16)

@@ -20,7 +20,7 @@ scheduler_gamma: 0.5
 temperature: 0.07
 weight_decay: 0.0001
 max_epochs: 10
-img_size: [176, 256] #[256, 256]
+img_size: [64, 128]
 lambda_l1: 0.0001
 encoder_type: 'clip' # 'clip'
 attn_hidden_dim: 1024  # large-1024 base 768

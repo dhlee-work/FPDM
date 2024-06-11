@@ -118,6 +118,7 @@ def reformat_sign_dataset(dataset_dir):
                                    'target_image': target})
     else:
         print('test file is not exists')
+
     filenames_annotation = []
     file_txt = '{}/annotations.txt'.format(dataset_dir)
     if os.path.exists(file_txt):
@@ -125,16 +126,15 @@ def reformat_sign_dataset(dataset_dir):
         dname = '/'.join(dataset_dir.split('/')[2:])
         target_old = None
         for idx , i in enumerate(data):
-            if len(data) == (idx-1):
-                continue
-            if idx == 0:
-                source = i.split(',')[0].replace(f'./{dname}/','./')
-            else:
-                source = target_old
+            # if len(data) == (idx-1):
+            #     continue
+            # if idx == 0:
+            #     source = i.split(',')[0].replace(f'./{dname}/','./')
+            # else:
+            #     source = target_old
+            source = i.split(',')[0].replace(f'./{dname}/', './')
             target = i.split(',')[1].replace(f'./{dname}/','./')
-            target_old = target
-            # source = os.path.join('./img', source)
-            # target = os.path.join('./img', target)
+            # target_old = target
             if not os.path.exists(os.path.join(dataset_dir, source)):
                 print(f'warnning : no such a image {source}')
             if not os.path.exists(os.path.join(dataset_dir,  target)):
@@ -230,8 +230,8 @@ def run_preprcessing_sign(dataset_dir):
     print('process finished !! ')
 
 root_dir = './dataset'
-dataset = 'deepfashion'# 'sign' #'market1501' # sign one_video_test
-dataset_type = 'train' #'video_test
+dataset = 'sign'# 'sign' #'market1501' # sign one_video_test
+dataset_type = 'video_test' #'video_test
 resized_dirname = 'resized_img'
 dataset_dir = os.path.join(root_dir, dataset)
 

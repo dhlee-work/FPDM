@@ -42,7 +42,8 @@ def load_logger(args):
     ckpt_cb = ModelCheckpoint(dirpath=log_dir,
                               monitor='val_loss',
                               mode="min",
-                              save_top_k=1,
+                              every_n_epochs=1,
+                              save_top_k=-1,
                               save_last=True)
 
     return logger, ckpt_cb

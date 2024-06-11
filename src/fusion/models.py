@@ -187,13 +187,13 @@ class FusionModel(pl.LightningModule):
         # lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(
         #     optimizer, T_max=self.hparams.max_epochs, eta_min=self.hparams.lr / 50
         # )
-        lr_scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=self.hparams.scheduler_t0,
-                                                     T_mult=self.hparams.scheduler_t_mult ,
-                                                     eta_max=self.hparams.scheduler_eta_max,
-                                                     T_up=self.hparams.scheduler_t_up,
-                                                     gamma= self.hparams.scheduler_gamma)
-
-        return [optimizer], [lr_scheduler]
+        # lr_scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=self.hparams.scheduler_t0,
+        #                                              T_mult=self.hparams.scheduler_t_mult ,
+        #                                              eta_max=self.hparams.scheduler_eta_max,
+        #                                              T_up=self.hparams.scheduler_t_up,
+        #                                              gamma= self.hparams.scheduler_gamma)
+        # lr_scheduler = None
+        return [optimizer] #, [lr_scheduler]
 
     def attention_fusion_info_nce_loss(self, img_s_feats, img_t_feats, fushion_feats, mode="train"):
         if self.hparams.patch_self_learning:
