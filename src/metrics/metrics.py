@@ -329,10 +329,6 @@ class Reconstruction_Metrics():
             img_gt = np.array(img_gt)/255.
             img_pred = Image.open(input_image_list[index]).convert("RGB").resize(img_size,Image.BICUBIC)
             img_pred = np.array(img_pred)/255.
-            # img_gt = (cv2.resize(cv2.cvtColor(cv2.imread(gt_image_list[index]), cv2.COLOR_BGR2RGB).astype(np.float32), img_size,
-            #                      interpolation=cv2.INTER_CUBIC)) / 255.0
-            # img_pred = (cv2.resize(cv2.cvtColor(cv2.imread(input_image_list[index]), cv2.COLOR_BGR2RGB).astype(np.float32), img_size,
-            #                        interpolation=cv2.INTER_CUBIC)) / 255.0
 
             if debug != 0:
                 plt.subplot('121')
@@ -351,8 +347,8 @@ class Reconstruction_Metrics():
 
             img_gt_256 = img_gt * 255.0
             img_pred_256 = img_pred * 255.0
-            ssim_256.append(compare_ssim(img_gt_256, img_pred_256, gaussian_weights=True, sigma=1.2,
-                                         use_sample_covariance=False, multichannel=True, channel_axis=2,
+            ssim_256.append(compare_ssim(img_gt_256, img_pred_256, gaussian_weights=True, sigma=1.5,
+                                         use_sample_covariance=False, channel_axis=2, # multichannel=True,
                                          data_range=img_pred_256.max() - img_pred_256.min()))
             if np.mod(index, 200) == 0:
                 print(

@@ -293,13 +293,13 @@ class FPDM(pl.LightningModule):
         #     optimizer, T_max=self.hparams.max_epochs,
         #     eta_min=self.hparams.lr * 0.001
         # )
-        lr_scheduler = optim.lr_scheduler.StepLR(
-            optimizer, step_size=self.hparams.step_size, scheduler_gamma=self.hparams.scheduler_gamma)
-        # lr_scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=self.hparams.scheduler_t0,
-        #                                              T_mult=self.hparams.scheduler_t_mult ,
-        #                                              eta_max=self.hparams.scheduler_eta_max,
-        #                                              T_up=self.hparams.scheduler_t_up,
-        #                                              gamma= self.hparams.scheduler_gamma)
+        # lr_scheduler = optim.lr_scheduler.StepLR(
+        #     optimizer, step_size=self.hparams.scheduler_step_size, gamma=self.hparams.scheduler_gamma)
+        lr_scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=self.hparams.scheduler_t0,
+                                                     T_mult=self.hparams.scheduler_t_mult ,
+                                                     eta_max=self.hparams.scheduler_eta_max,
+                                                     T_up=self.hparams.scheduler_t_up,
+                                                     gamma= self.hparams.scheduler_gamma)
         return [optimizer], [lr_scheduler]
 
     def image_grid(self, imgs, rows, cols):
@@ -362,6 +362,22 @@ class FPDM(pl.LightningModule):
             latents = latents * self.vae.config.scaling_factor
 
             # src img to patch embeddings
+            # Get the masked image latents
+            # if self.hparams.src_img_magcrop:
+            #     for _idx, (i, j) in enumerate([[0, 0], [0, 1], [1, 0], [1, 1]]):
+            #         repeat_src_img = torch.repeat_interleave(processed_source_image, 2, 2)
+            #         repeat_src_img = torch.repeat_interleave(repeat_src_img, 2, 3)
+            #         src_p_image = self.src_image_encoder(
+            #             repeat_src_img[:, :, 224 * i:224 * (i + 1), 224 * j:224 * (j + 1)])
+            #         src_p_image_emb = (src_p_image.last_hidden_state)[:, 1:, :].view(-1, 16, 16, 1024)
+            #         src_p_image_emb = src_p_image_emb.permute(0, 3, 1, 2)
+            #         pooled_emb = F.avg_pool2d(src_p_image_emb, 2, 2)
+            #         pooled_emb = pooled_emb.permute(0, 2, 3, 1).view(-1, 64, 1024)
+            #         if _idx == 0:
+            #             s_image_patch_embeddings = pooled_emb
+            #         else:
+            #             s_image_patch_embeddings = torch.cat((s_image_patch_embeddings, pooled_emb), axis=1)
+            # else:
             cond_src_feature = self.src_image_encoder(processed_source_image)
             s_image_patch_embeddings = (cond_src_feature.last_hidden_state)[:, 1:, :]
 
@@ -436,8 +452,25 @@ class FPDM(pl.LightningModule):
         generator = torch.Generator().manual_seed(self.hparams.seed_number)
 
         # Get the masked image latents
+        # if self.hparams.src_img_magcrop:
+        #     for _idx, (i, j) in enumerate([[0, 0], [0, 1], [1, 0], [1, 1]]):
+        #         repeat_src_img = torch.repeat_interleave(processed_source_image, 2, 2)
+        #         repeat_src_img = torch.repeat_interleave(repeat_src_img, 2, 3)
+        #         src_p_image = self.src_image_encoder(repeat_src_img[:, :, 224 * i:224 * (i + 1), 224 * j:224 * (j + 1)])
+        #         src_p_image_emb = (src_p_image.last_hidden_state)[:, 1:, :].view(-1, 16, 16, 1024)
+        #         src_p_image_emb = src_p_image_emb.permute(0, 3, 1, 2)
+        #         pooled_emb = F.avg_pool2d(src_p_image_emb, 2, 2)
+        #         pooled_emb = pooled_emb.permute(0, 2, 3, 1).view(-1, 64, 1024)
+        #         if _idx == 0:
+        #             s_image_patch_embeddings = pooled_emb
+        #         else:
+        #             s_image_patch_embeddings = torch.cat((s_image_patch_embeddings, pooled_emb), axis=1)
+        # else:
         cond_src_feature = self.src_image_encoder(processed_source_image)
         s_image_patch_embeddings = (cond_src_feature.last_hidden_state)[:, 1:, :]
+
+        # cond_src_feature = self.src_image_encoder(processed_source_image)
+        # s_image_patch_embeddings = (cond_src_feature.last_hidden_state)[:, 1:, :]
 
         # get fusion embeddings
         embddings_src = self.fusion_model_img_encoder(processed_source_image)

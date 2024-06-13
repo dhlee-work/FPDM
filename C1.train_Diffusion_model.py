@@ -41,7 +41,7 @@ def load_logger(config):
                              project=config.project_name,
                              log_model=True,
                              save_dir=log_dir,
-                             # id='i9dx3xud',  #'6kfds9ra',
+                             # id='hotn2s5p',  #'6kfds9ra',
                              # resume="allow",
                              # reinit=True
                              )

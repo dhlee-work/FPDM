@@ -8,6 +8,8 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 from transformers import AutoImageProcessor
+import torch.nn.functional as F
+from src.fusion.datautil import ProcessingKeypoints, ProcessingSignKeypoints
 # from timm.data.random_erasing import RandomErasing
 import matplotlib.pyplot as plt
 
@@ -68,6 +70,10 @@ class FPDM_Dataset(Dataset):
         self.image_processor = AutoImageProcessor.from_pretrained(self.src_encoder_path)   # 앞으로 빼기
         self.image_processor.size['shortest_edge'] = 224
 
+        self.image_src_processor = AutoImageProcessor.from_pretrained(self.src_encoder_path)   # 앞으로 빼기
+        # self.image_src_processor.size['shortest_edge'] = 512
+        # self.image_src_processor.crop_size = {"height": 512, "width": 512}
+
         self.random_erase = transforms.RandomErasing()
         self.ColorJitter_functions = {0: transforms.functional.adjust_brightness,
                                       1: transforms.functional.adjust_contrast,
@@ -77,27 +83,46 @@ class FPDM_Dataset(Dataset):
         self.transform_totensor = transforms.ToTensor()
         self.transform_normalize = transforms.Normalize([0.5], [0.5])
 
+        # self.PK = ProcessingKeypoints()
+
     def transforms(self, source_img, target_img, pos_t_img):
         # Random crop
-        if random.random() < 0.5:
-            crop = transforms.RandomResizedCrop(self.img_size)
-            params = crop.get_params(source_img, scale=(0.8, 1), ratio=(1.0, 1.0))
+        _pad_val = np.random.choice(int(self.model_img_size[0] * 0.4 // 2))
+        if random.random() < 0.0:  # 0.5
+            source_img = transforms.Pad(_pad_val, fill = 0, padding_mode="constant")(source_img)
+            source_img = transforms.functional.resize(source_img, self.model_img_size[::-1])
+
+        if random.random() < 0.0:  # 0.5
+            _pad_val = np.random.choice(int(self.model_img_size[0]*0.4//2))
+            target_img = transforms.Pad(_pad_val, fill = 256, padding_mode="constant")(target_img)
+            target_img = transforms.functional.resize(target_img, self.model_img_size[::-1])
+
+            pos_t_img = transforms.Pad(_pad_val, fill = 0, padding_mode="constant")(pos_t_img)
+            pos_t_img = transforms.functional.resize(pos_t_img, self.model_img_size[::-1])
+
+        if random.random() < 0.5:  # 0.5
+            crop = transforms.RandomResizedCrop(self.model_img_size)
+            params = crop.get_params(source_img, scale=(0.7, 1), ratio=(1.0, 1.0))
             source_img = transforms.functional.crop(source_img, *params)
             source_img = transforms.functional.resize(source_img, crop.size[::-1])
-            # target_img = transforms.functional.crop(target_img, *params)
-            # target_img = transforms.functional.resize(target_img, crop.size[::-1])
-            # pos_t_img = transforms.functional.crop(pos_t_img, *params)
-            # pos_t_img = transforms.functional.resize(pos_t_img, crop.size[::-1])
+
+        # if random.random() < 0.5:
+        # crop = transforms.RandomResizedCrop(self.img_size)
+        # params = crop.get_params(source_img, scale=(0.99, 1), ratio=(1.0, 1.0))
+        # # target_img = transforms.functional.crop(target_img, *params)
+        # # target_img = transforms.functional.resize(target_img, crop.size[::-1])
+        # pos_t_img = transforms.functional.crop(pos_t_img, *params)
+        # pos_t_img = transforms.functional.resize(pos_t_img, crop.size[::-1])
             
         # Random horizontal flipping
-        if random.random() < 0.0:
-            source_img = transforms.functional.hflip(source_img)
-        if random.random() < 0.0:
-            target_img = transforms.functional.hflip(target_img)
-            pos_t_img = transforms.functional.hflip(
-                pos_t_img)  # plt.imshow(pos_t_img.numpy().transpose(1,2,0)); plt.show()
+        # if random.random() < 0.0:
+        #     source_img = transforms.functional.hflip(source_img)
+        # if random.random() < 0.0:
+        #     target_img = transforms.functional.hflip(target_img)
+        #     pos_t_img = transforms.functional.hflip(
+        #         pos_t_img)  # plt.imshow(pos_t_img.numpy().transpose(1,2,0)); plt.show()
 
-        if random.random() < 0.2:  # 0.8
+        if random.random() < 0.0:  # 0.8
             jitter = transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.1)
             params = jitter.get_params(jitter.brightness, jitter.contrast, jitter.saturation, jitter.hue)
 
@@ -105,7 +130,7 @@ class FPDM_Dataset(Dataset):
                 source_img = self.ColorJitter_functions[i](source_img, params[i + 1])
                 target_img = self.ColorJitter_functions[i](target_img, params[i + 1])
 
-        if random.random() < 0.2:  # 0.2
+        if random.random() < 0.0:  # 0.2
             target_img = transforms.functional.rgb_to_grayscale(target_img, num_output_channels=3)
             source_img = transforms.functional.rgb_to_grayscale(source_img, num_output_channels=3)
 
@@ -131,17 +156,19 @@ class FPDM_Dataset(Dataset):
         if self.phase == 'train':
             s_img, t_img, t_pose = self.transforms(s_img, t_img, t_pose)
 
-        processed_s_img = (self.image_processor(images=s_img.resize((224, 224),Image.BICUBIC),
+        processed_s_img = (self.image_processor(images=s_img,
                                                 return_tensors="pt").pixel_values).squeeze(dim=0)
-        processed_t_pose = (self.image_processor(images=t_pose.resize((224, 224),Image.BICUBIC),
+        processed_t_pose = (self.image_processor(images=t_pose,
                                                  return_tensors="pt").pixel_values).squeeze(dim=0)
+        # processed_s_img = (self.image_src_processor(images=s_img,
+        #                                          return_tensors="pt").pixel_values).squeeze(dim=0)
 
         # trans_s_img = self.transform_normalize(self.transform_totensor(s_img))
         trans_t_img = self.transform_normalize(self.transform_totensor(t_img))
         trans_t_pose = self.transform_totensor(t_pose)
 
         if random.random() < self.pose_erase_rate:
-            params = self.random_erase.get_params(trans_t_pose, scale=(0.01, 0.5), ratio=(0.3, 3.3))
+            params = self.random_erase.get_params(trans_t_pose, scale=(0.05, 0.5), ratio=(0.3, 3.3))
             i, j, h, w, _ = params
             trans_t_pose[:,i:i+h,j:j+w] = 0
 
