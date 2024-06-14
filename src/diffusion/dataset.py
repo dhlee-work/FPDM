@@ -202,7 +202,7 @@ class FPDM_Dataset(Dataset):
             s_img, t_img, t_keypoint, t_kpt_pad = self.transforms(s_img, t_img,s_keypoint, t_keypoint)
 
         t_pose = self.PK.draw_img(t_keypoint, self.model_img_size, self.kpt_param)
-
+        t_pose
         if t_kpt_pad is not None:
             t_kpt_pad = t_kpt_pad.astype(int)
             t_pose = np.array(t_pose)
