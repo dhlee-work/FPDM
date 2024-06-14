@@ -17,11 +17,10 @@ class ProcessingKeypoints():
                        [85, 0, 255], \
                        [170, 0, 255], [255, 0, 255], [255, 0, 170], [255, 0, 85]]
 
-    def trans_keypoins(self, keypoints, param, img_size):
+    def trans_keypoins(self, keypoints, img_size, param):
         missing_keypoint_index = keypoints == -1
 
         # crop the white line in the original dataset
-
         keypoints[:, 0] = (keypoints[:, 0] - param['offset'])
 
         # resize the dataset
@@ -43,12 +42,8 @@ class ProcessingKeypoints():
         keypoints[:, 1] = keypoints[:, 1] * scale_h - h
         keypoints[missing_keypoint_index] = -1
         return keypoints
-
-    def get_label_tensor(self, path, img, param):
-        canvas = np.zeros((img.shape[0], img.shape[1], 3)).astype(np.uint8)
-        # keypoint = np.loadtxt(path)
-        keypoint = np.loadtxt(path)
-        keypoint = self.trans_keypoins(keypoint, param, img.shape[:2])
+    def draw_img(self,keypoint, img_size, param):
+        canvas = np.zeros((img_size[0], img_size[1], 3)).astype(np.uint8)
         stickwidth = param['stickwidth']
         for i in range(18):
             x, y = keypoint[i, 0:2]
@@ -70,14 +65,19 @@ class ProcessingKeypoints():
             polygon = cv2.ellipse2Poly((int(mY), int(mX)), (int(length / 2), stickwidth), int(angle), 0, 360, 1)
             cv2.fillConvexPoly(cur_canvas, polygon, self.colors[i])
             canvas = cv2.addWeighted(canvas, 0.4, cur_canvas, 0.6, 0)
-
             joint = np.zeros_like(cur_canvas[:, :, 0])
             cv2.fillConvexPoly(joint, polygon, 255)
             joint = cv2.addWeighted(joint, 0.4, joint, 0.6, 0)
             joints.append(joint)
         pose = Image.fromarray(cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB))
-        label_tensor = pose  # torch.cat((pose, tensors_dist), dim=0)
+        label_tensor = pose
+        return label_tensor
 
+    def get_label_tensor(self, path, img, param):
+        # keypoint = np.loadtxt(path)
+        keypoint = np.loadtxt(path)
+        keypoint = self.trans_keypoins(keypoint, img.shape[:2], param)
+        label_tensor = self.draw_img(self, keypoint, img, param)
         return label_tensor
 
 

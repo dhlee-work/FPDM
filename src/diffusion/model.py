@@ -178,6 +178,13 @@ class SDModel(torch.nn.Module):
             else:
                 encoder_image_hidden_states = extra_patch_embeddings_s + extra_patch_embeddings_f
 
+            if self.args.proj_embds_sum == True:
+                encoder_image_hidden_states = encoder_image_hidden_states.reshape(encoder_image_hidden_states.shape[0],
+                                                    encoder_image_hidden_states.shape[1]//2,
+                                                    2,
+                                                    encoder_image_hidden_states.shape[2])
+                encoder_image_hidden_states = encoder_image_hidden_states.sum(2)
+
             if phase == 'train':
                 batch_size = encoder_image_hidden_states.shape[0]
                 embed_size = encoder_image_hidden_states.shape[1]
@@ -322,6 +329,7 @@ class FPDM(pl.LightningModule):
                                                                  Image.BICUBIC)
         else:
             t_img = None
+
         t_pose = Image.open(t_pose_path).convert("RGB").resize((self.hparams.img_size),
                                                                Image.BICUBIC)
         # enhancer = ImageEnhance.Brightness(s_img)
@@ -524,6 +532,7 @@ class FPDM(pl.LightningModule):
             guidance_scale=self.hparams.guidance_scale,
             generator=generator,
             num_inference_steps=self.hparams.num_inference_steps,
+            args=self.hparams
         )
         return output
 

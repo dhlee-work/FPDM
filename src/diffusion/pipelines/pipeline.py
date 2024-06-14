@@ -396,7 +396,8 @@ class FPDM_DiffusionPipeline(DiffusionPipeline):
             t_pose_f: Optional[torch.FloatTensor] = None,
             pred_t_img_embed: Optional[torch.FloatTensor] = None,
             fusion_img_embed: Optional[torch.FloatTensor] = None,
-            noise_offset : float = None
+            noise_offset : float = None,
+            args = None
     ):
 
         device = self._execution_device
@@ -415,6 +416,12 @@ class FPDM_DiffusionPipeline(DiffusionPipeline):
         # source patch feature + pred. target patch feature
         if pred_t_img_embed is not None:
             feature_f = torch.cat([s_img_proj_f, pred_t_img_embed], dim=1)
+            if args.proj_embds_sum == True:
+                feature_f = feature_f.reshape(feature_f.shape[0],
+                                                    feature_f.shape[1]//2,
+                                                    2,
+                                                    feature_f.shape[2])
+                feature_f = feature_f.sum(2)
         else:
             feature_f = s_img_proj_f
         feature_f = feature_f.repeat(bs * num_images_per_prompt, 1, 1).to(device=device)  # dtype=torch.float16,
