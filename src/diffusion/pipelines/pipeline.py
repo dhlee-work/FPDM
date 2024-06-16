@@ -414,14 +414,11 @@ class FPDM_DiffusionPipeline(DiffusionPipeline):
         # pose_cond = pose_cond  # .to(device=device) # dtype=torch.float16,
 
         # source patch feature + pred. target patch feature
-        if pred_t_img_embed is not None:
-            feature_f = torch.cat([s_img_proj_f, pred_t_img_embed], dim=1)
-            if args.proj_embds_sum == True:
-                feature_f = feature_f.reshape(feature_f.shape[0],
-                                                    feature_f.shape[1]//2,
-                                                    2,
-                                                    feature_f.shape[2])
-                feature_f = feature_f.sum(2)
+        if not args.fusion_patch_embed_ahead:
+            if args.proj_embd_concat:
+                feature_f = torch.cat([s_img_proj_f, pred_t_img_embed], dim=1)
+            else:
+                feature_f = s_img_proj_f + pred_t_img_embed
         else:
             feature_f = s_img_proj_f
         feature_f = feature_f.repeat(bs * num_images_per_prompt, 1, 1).to(device=device)  # dtype=torch.float16,

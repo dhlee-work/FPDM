@@ -30,61 +30,24 @@ import math
 from torch.optim.lr_scheduler import LRScheduler
 import random
 import matplotlib.pyplot as plt
-class CosineAnnealingWarmUpRestarts(LRScheduler):
-    def __init__(self, optimizer, T_0, T_mult=1, eta_max=0.1, T_up=0, gamma=1., last_epoch=-1):
-        if T_0 <= 0 or not isinstance(T_0, int):
-            raise ValueError("Expected positive integer T_0, but got {}".format(T_0))
-        if T_mult < 1 or not isinstance(T_mult, int):
-            raise ValueError("Expected integer T_mult >= 1, but got {}".format(T_mult))
-        if T_up < 0 or not isinstance(T_up, int):
-            raise ValueError("Expected positive integer T_up, but got {}".format(T_up))
-        self.T_0 = T_0
-        self.T_mult = T_mult
-        self.base_eta_max = eta_max
-        self.eta_max = eta_max
-        self.T_up = T_up
-        self.T_i = T_0
+
+class WarmupStepLR(LRScheduler):
+    def __init__(self, optimizer, warmup_steps, step_size, gamma=0.1, base_lr=1e-3, last_epoch=-1):
+        self.warmup_steps = warmup_steps
+        self.step_size = step_size
         self.gamma = gamma
-        self.cycle = 0
-        self.T_cur = last_epoch
-        super(CosineAnnealingWarmUpRestarts, self).__init__(optimizer, last_epoch)
+        self.base_lr = base_lr
+        super(WarmupStepLR, self).__init__(optimizer, last_epoch)
 
     def get_lr(self):
-        if self.T_cur == -1:
-            return self.base_lrs
-        elif self.T_cur < self.T_up:
-            return [(self.eta_max - base_lr) * self.T_cur / self.T_up + base_lr for base_lr in self.base_lrs]
+        if self.last_epoch < self.warmup_steps:
+            # Warmup phase
+            return [self.base_lr * (self.last_epoch + 1) / self.warmup_steps for _ in self.base_lrs]
         else:
-            return [base_lr + (self.eta_max - base_lr) * (
-                        1 + math.cos(math.pi * (self.T_cur - self.T_up) / (self.T_i - self.T_up))) / 2
-                    for base_lr in self.base_lrs]
-
-    def step(self, epoch=None):
-        if epoch is None:
-            epoch = self.last_epoch + 1
-            self.T_cur = self.T_cur + 1
-            if self.T_cur >= self.T_i:
-                self.cycle += 1
-                self.T_cur = self.T_cur - self.T_i
-                self.T_i = (self.T_i - self.T_up) * self.T_mult + self.T_up
-        else:
-            if epoch >= self.T_0:
-                if self.T_mult == 1:
-                    self.T_cur = epoch % self.T_0
-                    self.cycle = epoch // self.T_0
-                else:
-                    n = int(math.log((epoch / self.T_0 * (self.T_mult - 1) + 1), self.T_mult))
-                    self.cycle = n
-                    self.T_cur = epoch - self.T_0 * (self.T_mult ** n - 1) / (self.T_mult - 1)
-                    self.T_i = self.T_0 * self.T_mult ** (n)
-            else:
-                self.T_i = self.T_0
-                self.T_cur = epoch
-
-        self.eta_max = self.base_eta_max * (self.gamma ** self.cycle)
-        self.last_epoch = math.floor(epoch)
-        for param_group, lr in zip(self.optimizer.param_groups, self.get_lr()):
-            param_group['lr'] = lr
+            # StepLR phase
+            steps_since_warmup = self.last_epoch - self.warmup_steps
+            factor = self.gamma ** (steps_since_warmup // self.step_size)
+            return [base_lr * factor for base_lr in self.base_lrs]
 
 class ImageProjModel_s(torch.nn.Module):
     """SD model with image prompt"""
@@ -123,6 +86,53 @@ class ImageProjModel_f(torch.nn.Module):
     def forward(self, x):
         return self.net(x)
 
+def zero_module(module):
+    for p in module.parameters():
+        nn.init.zeros_(p)
+    return module
+
+class Patch_embedding_proj(nn.Module):
+    """
+    Quoting from https://arxiv.org/abs/2302.05543: "Stable Diffusion uses a pre-processing method similar to VQ-GAN
+    [11] to convert the entire dataset of 512 × 512 images into smaller 64 × 64 “latent images” for stabilized
+    training. This requires ControlNets to convert image-based conditions to 64 × 64 feature space to match the
+    convolution size. We use a tiny network E(·) of four convolution layers with 4 × 4 kernels and 2 × 2 strides
+    (activated by ReLU, channels are 16, 32, 64, 128, initialized with Gaussian weights, trained jointly with the full
+    model) to encode image-space conditions ... into feature maps ..."
+    """
+
+    def __init__(
+        self,
+        in_dim: int = 1024,
+        hidden_dim: int = 768,
+        out_dim: int = 320,
+        dropout: float = 0.2,
+        upsmaple_size: int = 4
+    ):
+        super().__init__()
+
+        self.hidden_dim = hidden_dim
+        self.net = nn.Sequential(
+            nn.Linear(in_dim, self.hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.LayerNorm(self.hidden_dim),
+            nn.Linear(self.hidden_dim, self.hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.LayerNorm(self.hidden_dim),
+        )
+        self.upsample = nn.Upsample(scale_factor=upsmaple_size, mode='nearest')
+        self.conv_out = nn.Conv2d(self.hidden_dim, out_dim, kernel_size=1, padding=0)
+
+    def forward(self, embed):
+        embed = self.net(embed)
+        embed = embed.transpose(2, 1)
+        embed = embed.view(-1, self.hidden_dim, 16, 16)
+        embed = self.upsample(embed)
+        embed = self.conv_out(embed)
+        return embed
+
 
 class SDModel(torch.nn.Module):
     """SD model with image prompt"""
@@ -130,17 +140,29 @@ class SDModel(torch.nn.Module):
     def __init__(self, unet, args) -> None:
         super().__init__()
         self.args = args
+
+        if args.model_img_size[0] == 256:
+            upsmaple_size = 2
+        elif args.model_img_size[0] == 512:
+            upsmaple_size = 4
+        else:
+            print('model only can compute img size 256 or 512')
+
         self.image_proj_model_s = ImageProjModel_s(in_dim=self.args.patch_proj_in_dim, hidden_dim=768, out_dim=1024,
                                                    dropout=self.args.proj_drop_rate)
-        self.image_proj_model_f = ImageProjModel_f(in_dim=self.args.patch_proj_in_dim, hidden_dim=768, out_dim=1024,
-                                                   dropout=self.args.proj_drop_rate)
+
+        if self.args.fusion_patch_embed_ahead == True:
+            self.image_proj_model_f = Patch_embedding_proj(in_dim=self.args.patch_proj_in_dim, hidden_dim=768, out_dim=320,
+                                                           dropout=self.args.proj_drop_rate, upsmaple_size=upsmaple_size)
+        else:
+            self.image_proj_model_f = ImageProjModel_f(in_dim=self.args.patch_proj_in_dim, hidden_dim=768, out_dim=1024,
+                                                       dropout=self.args.proj_drop_rate)
+            self.pose_proj = ControlNetConditioningEmbedding(
+                conditioning_embedding_channels=320,
+                block_out_channels=(16, 32, 96, 256),
+                conditioning_channels=3)
 
         self.unet = unet
-        self.pose_proj = ControlNetConditioningEmbedding(
-            conditioning_embedding_channels=320,
-            block_out_channels=(16, 32, 96, 256),
-            conditioning_channels=3)
-
     def _execution_device(self):
         r"""
         Returns the device on which the pipeline's models will be executed. After calling
@@ -161,42 +183,32 @@ class SDModel(torch.nn.Module):
     def forward(self, noisy_latents, timesteps,
                 cond_src_image_feature, cond_img_patch_feature,
                 cond_attn_patch_feature, pose_f, phase):
+
         if self.args.fusion_image_patch_encoder == True:
             extra_patch_embeddings_s = self.image_proj_model_s(cond_img_patch_feature)
-            if self.args.proj_fusion_image_patch_encoder == True:
-                extra_patch_embeddings_f = self.image_proj_model_f(cond_attn_patch_feature)
-            else:
-                extra_patch_embeddings_f = cond_attn_patch_feature
-            if phase == 'train':
-                if random.random() < self.args.module_drop_rate:
-                    extra_patch_embeddings_s = torch.zeros(extra_patch_embeddings_s.shape).to(self.unet.device)
-                if random.random() < self.args.module_drop_rate:
-                    extra_patch_embeddings_f = torch.zeros(extra_patch_embeddings_f.shape).to(self.unet.device)
-
+            extra_patch_embeddings_f = self.image_proj_model_f(cond_attn_patch_feature)
+            # if self.args.proj_fusion_image_patch_encoder == True:
+            #     extra_patch_embeddings_f = self.image_proj_model_f(cond_attn_patch_feature)
+            # else:
+            #     extra_patch_embeddings_f = cond_attn_patch_feature
+            # if phase == 'train':
+            #     if random.random() < self.args.module_drop_rate:
+            #         extra_patch_embeddings_s = torch.zeros(extra_patch_embeddings_s.shape).to(self.unet.device)
+            #     if random.random() < self.args.module_drop_rate:
+            #         extra_patch_embeddings_f = torch.zeros(extra_patch_embeddings_f.shape).to(self.unet.device)
             if self.args.proj_embd_concat == True:
                 encoder_image_hidden_states = torch.cat((extra_patch_embeddings_s, extra_patch_embeddings_f), axis =1)
+            elif self.args.proj_embd_concat == False and self.args.fusion_patch_embed_ahead == True:
+                encoder_image_hidden_states = extra_patch_embeddings_s
             else:
                 encoder_image_hidden_states = extra_patch_embeddings_s + extra_patch_embeddings_f
-
-            if self.args.proj_embds_sum == True:
-                encoder_image_hidden_states = encoder_image_hidden_states.reshape(encoder_image_hidden_states.shape[0],
-                                                    encoder_image_hidden_states.shape[1]//2,
-                                                    2,
-                                                    encoder_image_hidden_states.shape[2])
-                encoder_image_hidden_states = encoder_image_hidden_states.sum(2)
-
-            if phase == 'train':
-                batch_size = encoder_image_hidden_states.shape[0]
-                embed_size = encoder_image_hidden_states.shape[1]
-                for _i in range(batch_size):
-                    drop_idx = np.random.choice(embed_size, int(embed_size*self.args.embedded_drop_rate))
-                    encoder_image_hidden_states[_i,drop_idx,:] = 0
         else:
             extra_patch_embeddings_s = self.image_proj_model_s(cond_img_patch_feature)
             if phase == 'train':
                 if random.random() < self.args.module_drop_rate:
                     extra_patch_embeddings_s = torch.zeros(extra_patch_embeddings_s.shape).to(self.unet.device)
             encoder_image_hidden_states = extra_patch_embeddings_s
+
 
         if self.args.fusion_image_encoder == True:
             if phase == 'train':
@@ -205,7 +217,10 @@ class SDModel(torch.nn.Module):
         else:
             cond_src_image_feature = None
 
-        pose_cond = self.pose_proj(pose_f)
+        if self.args.fusion_image_patch_encoder == True and self.args.fusion_patch_embed_ahead == True:
+            pose_cond = extra_patch_embeddings_f
+        else:
+            pose_cond = self.pose_proj(pose_f)
 
         if self.args.pose_module_drop == True:
             pose_cond = torch.zeros(pose_cond.shape).to(self.unet.device)
@@ -236,7 +251,6 @@ class FPDM(pl.LightningModule):
 
         # Load model
         self.vae = AutoencoderKL.from_pretrained(self.hparams.pretrained_model_name_or_path, subfolder="vae")
-
         if self.hparams.fusion_image_encoder == True:
             self.class_embed_type = self.hparams.class_embed_type # "projection"
         else:
@@ -245,6 +259,7 @@ class FPDM(pl.LightningModule):
         self.unet = UNet2DConditionModel.from_pretrained(self.hparams.pretrained_model_name_or_path, subfolder="unet",
                                                          in_channels=4, class_embed_type=self.class_embed_type,
                                                          projection_class_embeddings_input_dim=768,
+                                                         conv_in_kernel=self.hparams.unet_conv_in_kenel,
                                                          low_cpu_mem_usage=False, ignore_mismatched_sizes=True)
 
         # fusion model load
@@ -296,17 +311,13 @@ class FPDM(pl.LightningModule):
         optimizer = optim.AdamW(self.parameters(),
                                 lr=self.hparams.lr,
                                 weight_decay=self.hparams.weight_decay)
-        # lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(
-        #     optimizer, T_max=self.hparams.max_epochs,
-        #     eta_min=self.hparams.lr * 0.001
-        # )
-        # lr_scheduler = optim.lr_scheduler.StepLR(
-        #     optimizer, step_size=self.hparams.scheduler_step_size, gamma=self.hparams.scheduler_gamma)
-        lr_scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=self.hparams.scheduler_t0,
-                                                     T_mult=self.hparams.scheduler_t_mult ,
-                                                     eta_max=self.hparams.scheduler_eta_max,
-                                                     T_up=self.hparams.scheduler_t_up,
-                                                     gamma= self.hparams.scheduler_gamma)
+
+        lr_scheduler = WarmupStepLR(optimizer = optimizer,
+                                    warmup_steps = self.hparams.scheduler_t_up,
+                                    step_size = self.hparams.scheduler_step_size,
+                                    gamma = self.hparams.scheduler_gamma,
+                                    base_lr=self.hparams.scheduler_eta_max)
+
         return [optimizer], [lr_scheduler]
 
     def image_grid(self, imgs, rows, cols):
@@ -332,8 +343,7 @@ class FPDM(pl.LightningModule):
 
         t_pose = Image.open(t_pose_path).convert("RGB").resize((self.hparams.img_size),
                                                                Image.BICUBIC)
-        # enhancer = ImageEnhance.Brightness(s_img)
-        # s_img = enhancer.enhance(1.5)
+
 
         s_img = s_img.resize(self.hparams.model_img_size, Image.BICUBIC)
         t_img = t_img.resize(self.hparams.model_img_size, Image.BICUBIC)
@@ -347,7 +357,7 @@ class FPDM(pl.LightningModule):
             trans_t_img = self.transform_normalize(trans_t_img).to(self.dtype).to(self.device).unsqueeze(0)
         else:
             trans_t_img = None
-        # trans_t_pose = self.transform(t_pose).to(self.dtype).to(self.device).unsqueeze(0)
+
         trans_t_pose = self.transform_totensor(t_pose).to(self.dtype).to(self.device).unsqueeze(0)
 
         processed_s_img = (self.image_processor(images=s_img.resize((224, 224)),
@@ -369,23 +379,6 @@ class FPDM(pl.LightningModule):
             latents = self.vae.encode(target_imgs).latent_dist.sample()
             latents = latents * self.vae.config.scaling_factor
 
-            # src img to patch embeddings
-            # Get the masked image latents
-            # if self.hparams.src_img_magcrop:
-            #     for _idx, (i, j) in enumerate([[0, 0], [0, 1], [1, 0], [1, 1]]):
-            #         repeat_src_img = torch.repeat_interleave(processed_source_image, 2, 2)
-            #         repeat_src_img = torch.repeat_interleave(repeat_src_img, 2, 3)
-            #         src_p_image = self.src_image_encoder(
-            #             repeat_src_img[:, :, 224 * i:224 * (i + 1), 224 * j:224 * (j + 1)])
-            #         src_p_image_emb = (src_p_image.last_hidden_state)[:, 1:, :].view(-1, 16, 16, 1024)
-            #         src_p_image_emb = src_p_image_emb.permute(0, 3, 1, 2)
-            #         pooled_emb = F.avg_pool2d(src_p_image_emb, 2, 2)
-            #         pooled_emb = pooled_emb.permute(0, 2, 3, 1).view(-1, 64, 1024)
-            #         if _idx == 0:
-            #             s_image_patch_embeddings = pooled_emb
-            #         else:
-            #             s_image_patch_embeddings = torch.cat((s_image_patch_embeddings, pooled_emb), axis=1)
-            # else:
             cond_src_feature = self.src_image_encoder(processed_source_image)
             s_image_patch_embeddings = (cond_src_feature.last_hidden_state)[:, 1:, :]
 
@@ -459,21 +452,6 @@ class FPDM(pl.LightningModule):
 
         generator = torch.Generator().manual_seed(self.hparams.seed_number)
 
-        # Get the masked image latents
-        # if self.hparams.src_img_magcrop:
-        #     for _idx, (i, j) in enumerate([[0, 0], [0, 1], [1, 0], [1, 1]]):
-        #         repeat_src_img = torch.repeat_interleave(processed_source_image, 2, 2)
-        #         repeat_src_img = torch.repeat_interleave(repeat_src_img, 2, 3)
-        #         src_p_image = self.src_image_encoder(repeat_src_img[:, :, 224 * i:224 * (i + 1), 224 * j:224 * (j + 1)])
-        #         src_p_image_emb = (src_p_image.last_hidden_state)[:, 1:, :].view(-1, 16, 16, 1024)
-        #         src_p_image_emb = src_p_image_emb.permute(0, 3, 1, 2)
-        #         pooled_emb = F.avg_pool2d(src_p_image_emb, 2, 2)
-        #         pooled_emb = pooled_emb.permute(0, 2, 3, 1).view(-1, 64, 1024)
-        #         if _idx == 0:
-        #             s_image_patch_embeddings = pooled_emb
-        #         else:
-        #             s_image_patch_embeddings = torch.cat((s_image_patch_embeddings, pooled_emb), axis=1)
-        # else:
         cond_src_feature = self.src_image_encoder(processed_source_image)
         s_image_patch_embeddings = (cond_src_feature.last_hidden_state)[:, 1:, :]
 
@@ -507,15 +485,21 @@ class FPDM(pl.LightningModule):
             cond_attn_patch_embeddings = self.fusion_model_attention(q_t_pose_patch_embeddings,
                                                                      kv_s_image_patch_embeddings,
                                                                      kv_s_image_patch_embeddings)
-            if self.hparams.proj_fusion_image_patch_encoder:
-                cond_image_feature_f = self.sd_model.image_proj_model_f(cond_attn_patch_embeddings)
-            else:
-                cond_image_feature_f = cond_attn_patch_embeddings
+            cond_image_feature_f = self.sd_model.image_proj_model_f(cond_attn_patch_embeddings)
+            # if self.hparams.proj_fusion_image_patch_encoder:
+            #     cond_image_feature_f = self.sd_model.image_proj_model_f(cond_attn_patch_embeddings)
+            # else:
+            #     cond_image_feature_f = cond_attn_patch_embeddings
         else:
             cond_image_feature_f = None
 
         # pose image embedding
-        t_pose_f = self.sd_model.pose_proj(target_pose)
+        # t_pose_f = self.sd_model.pose_proj(target_pose)
+        if self.hparams.fusion_image_patch_encoder and self.hparams.fusion_patch_embed_ahead:
+            t_pose_f = cond_image_feature_f
+        else:
+            t_pose_f = self.sd_model.pose_proj(target_pose)
+
         if self.hparams.pose_module_drop == True:
             t_pose_f = torch.zeros(t_pose_f.shape).to(self.unet.device)
 
