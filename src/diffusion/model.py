@@ -49,7 +49,7 @@ class WarmupStepLR(LRScheduler):
             factor = self.gamma ** (steps_since_warmup // self.step_size)
             return [base_lr * factor for base_lr in self.base_lrs]
 
-class ImageProjModel_s(torch.nn.Module):
+class SrcImage_ProjModel(torch.nn.Module):
     """SD model with image prompt"""
 
     def __init__(self, in_dim, hidden_dim, out_dim, dropout=0.):
@@ -68,7 +68,7 @@ class ImageProjModel_s(torch.nn.Module):
         return self.net(x)
 
 
-class ImageProjModel_f(torch.nn.Module):
+class FusionPatch_ProjModel(torch.nn.Module):
     """SD model with image prompt"""
 
     def __init__(self, in_dim, hidden_dim, out_dim, dropout=0.):
@@ -91,47 +91,47 @@ def zero_module(module):
         nn.init.zeros_(p)
     return module
 
-class Patch_embedding_proj(nn.Module):
-    """
-    Quoting from https://arxiv.org/abs/2302.05543: "Stable Diffusion uses a pre-processing method similar to VQ-GAN
-    [11] to convert the entire dataset of 512 × 512 images into smaller 64 × 64 “latent images” for stabilized
-    training. This requires ControlNets to convert image-based conditions to 64 × 64 feature space to match the
-    convolution size. We use a tiny network E(·) of four convolution layers with 4 × 4 kernels and 2 × 2 strides
-    (activated by ReLU, channels are 16, 32, 64, 128, initialized with Gaussian weights, trained jointly with the full
-    model) to encode image-space conditions ... into feature maps ..."
-    """
-
-    def __init__(
-        self,
-        in_dim: int = 1024,
-        hidden_dim: int = 768,
-        out_dim: int = 320,
-        dropout: float = 0.2,
-        upsmaple_size: int = 4
-    ):
-        super().__init__()
-
-        self.hidden_dim = hidden_dim
-        self.net = nn.Sequential(
-            nn.Linear(in_dim, self.hidden_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.LayerNorm(self.hidden_dim),
-            nn.Linear(self.hidden_dim, self.hidden_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.LayerNorm(self.hidden_dim),
-        )
-        self.upsample = nn.Upsample(scale_factor=upsmaple_size, mode='nearest')
-        self.conv_out = nn.Conv2d(self.hidden_dim, out_dim, kernel_size=1, padding=0)
-
-    def forward(self, embed):
-        embed = self.net(embed)
-        embed = embed.transpose(2, 1)
-        embed = embed.view(-1, self.hidden_dim, 16, 16)
-        embed = self.upsample(embed)
-        embed = self.conv_out(embed)
-        return embed
+# class Patch_embedding_proj(nn.Module):
+#     """
+#     Quoting from https://arxiv.org/abs/2302.05543: "Stable Diffusion uses a pre-processing method similar to VQ-GAN
+#     [11] to convert the entire dataset of 512 × 512 images into smaller 64 × 64 “latent images” for stabilized
+#     training. This requires ControlNets to convert image-based conditions to 64 × 64 feature space to match the
+#     convolution size. We use a tiny network E(·) of four convolution layers with 4 × 4 kernels and 2 × 2 strides
+#     (activated by ReLU, channels are 16, 32, 64, 128, initialized with Gaussian weights, trained jointly with the full
+#     model) to encode image-space conditions ... into feature maps ..."
+#     """
+#
+#     def __init__(
+#         self,
+#         in_dim: int = 1024,
+#         hidden_dim: int = 768,
+#         out_dim: int = 320,
+#         dropout: float = 0.2,
+#         upsmaple_size: int = 4
+#     ):
+#         super().__init__()
+#
+#         self.hidden_dim = hidden_dim
+#         self.net = nn.Sequential(
+#             nn.Linear(in_dim, self.hidden_dim),
+#             nn.GELU(),
+#             nn.Dropout(dropout),
+#             nn.LayerNorm(self.hidden_dim),
+#             nn.Linear(self.hidden_dim, self.hidden_dim),
+#             nn.GELU(),
+#             nn.Dropout(dropout),
+#             nn.LayerNorm(self.hidden_dim),
+#         )
+#         self.upsample = nn.Upsample(scale_factor=upsmaple_size, mode='nearest')
+#         self.conv_out = nn.Conv2d(self.hidden_dim, out_dim, kernel_size=1, padding=0)
+#
+#     def forward(self, embed):
+#         embed = self.net(embed)
+#         embed = embed.transpose(2, 1)
+#         embed = embed.view(-1, self.hidden_dim, 16, 16)
+#         embed = self.upsample(embed)
+#         embed = self.conv_out(embed)
+#         return embed
 
 
 class SDModel(torch.nn.Module):
@@ -141,26 +141,27 @@ class SDModel(torch.nn.Module):
         super().__init__()
         self.args = args
 
-        if args.model_img_size[0] == 256:
-            upsmaple_size = 2
-        elif args.model_img_size[0] == 512:
-            upsmaple_size = 4
-        else:
-            print('model only can compute img size 256 or 512')
+        # if args.model_img_size[0] == 256:
+        #     upsmaple_size = 2
+        # elif args.model_img_size[0] == 512:
+        #     upsmaple_size = 4
+        # else:
+        #     print('model only can compute img size 256 or 512')
 
-        self.image_proj_model_s = ImageProjModel_s(in_dim=self.args.patch_proj_in_dim, hidden_dim=768, out_dim=1024,
+        self.srcimage_proj_model = SrcImage_ProjModel(in_dim=self.args.patch_proj_in_dim, hidden_dim=768, out_dim=1024,
                                                    dropout=self.args.proj_drop_rate)
 
-        if self.args.fusion_patch_embed_ahead == True:
-            self.image_proj_model_f = Patch_embedding_proj(in_dim=self.args.patch_proj_in_dim, hidden_dim=768, out_dim=320,
-                                                           dropout=self.args.proj_drop_rate, upsmaple_size=upsmaple_size)
-        else:
-            self.image_proj_model_f = ImageProjModel_f(in_dim=self.args.patch_proj_in_dim, hidden_dim=768, out_dim=1024,
-                                                       dropout=self.args.proj_drop_rate)
-            self.pose_proj = ControlNetConditioningEmbedding(
-                conditioning_embedding_channels=320,
-                block_out_channels=(16, 32, 96, 256),
-                conditioning_channels=3)
+        # if self.args.fusion_patch_embed_ahead == True:
+        #     self.fusionpatch_proj_model = Patch_embedding_proj(in_dim=self.args.patch_proj_in_dim, hidden_dim=768, out_dim=320,
+        #                                                    dropout=self.args.proj_drop_rate, upsmaple_size=upsmaple_size)
+        # else:
+
+        self.fusionpatch_proj_model = FusionPatch_ProjModel(in_dim=self.args.patch_proj_in_dim, hidden_dim=768, out_dim=1024,
+                                                   dropout=self.args.proj_drop_rate)
+        self.pose_proj = ControlNetConditioningEmbedding(
+            conditioning_embedding_channels=320,
+            block_out_channels=(16, 32, 96, 256),
+            conditioning_channels=3)
 
         self.unet = unet
     def _execution_device(self):
@@ -185,10 +186,10 @@ class SDModel(torch.nn.Module):
                 cond_attn_patch_feature, pose_f, phase):
 
         if self.args.fusion_image_patch_encoder == True:
-            extra_patch_embeddings_s = self.image_proj_model_s(cond_img_patch_feature)
-            extra_patch_embeddings_f = self.image_proj_model_f(cond_attn_patch_feature)
+            extra_patch_embeddings_s = self.srcimage_proj_model(cond_img_patch_feature)
+            extra_patch_embeddings_f = self.fusionpatch_proj_model(cond_attn_patch_feature)
             # if self.args.proj_fusion_image_patch_encoder == True:
-            #     extra_patch_embeddings_f = self.image_proj_model_f(cond_attn_patch_feature)
+            #     extra_patch_embeddings_f = self.fusionpatch_proj_model(cond_attn_patch_feature)
             # else:
             #     extra_patch_embeddings_f = cond_attn_patch_feature
             # if phase == 'train':
@@ -203,7 +204,7 @@ class SDModel(torch.nn.Module):
             else:
                 encoder_image_hidden_states = extra_patch_embeddings_s + extra_patch_embeddings_f
         else:
-            extra_patch_embeddings_s = self.image_proj_model_s(cond_img_patch_feature)
+            extra_patch_embeddings_s = self.srcimage_proj_model(cond_img_patch_feature)
             if phase == 'train':
                 if random.random() < self.args.module_drop_rate:
                     extra_patch_embeddings_s = torch.zeros(extra_patch_embeddings_s.shape).to(self.unet.device)
@@ -476,7 +477,7 @@ class FPDM(pl.LightningModule):
             cond_fusion_image_feature = None
         # patch embeddings
         #### src image patch embeddings
-        s_img_proj_f = self.sd_model.image_proj_model_s(s_image_patch_embeddings)
+        s_img_proj_f = self.sd_model.srcimage_proj_model(s_image_patch_embeddings)
 
         if self.hparams.fusion_image_patch_encoder:
             ##### pred target image patch embeddings fusion
@@ -485,9 +486,9 @@ class FPDM(pl.LightningModule):
             cond_attn_patch_embeddings = self.fusion_model_attention(q_t_pose_patch_embeddings,
                                                                      kv_s_image_patch_embeddings,
                                                                      kv_s_image_patch_embeddings)
-            cond_image_feature_f = self.sd_model.image_proj_model_f(cond_attn_patch_embeddings)
+            cond_image_feature_f = self.sd_model.fusionpatch_proj_model(cond_attn_patch_embeddings)
             # if self.hparams.proj_fusion_image_patch_encoder:
-            #     cond_image_feature_f = self.sd_model.image_proj_model_f(cond_attn_patch_embeddings)
+            #     cond_image_feature_f = self.sd_model.fusionpatch_proj_model(cond_attn_patch_embeddings)
             # else:
             #     cond_image_feature_f = cond_attn_patch_embeddings
         else:

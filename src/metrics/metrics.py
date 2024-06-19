@@ -2,11 +2,11 @@ import glob
 import os
 import pathlib
 
-# import pandas as pd
-# import json
-# import imageio
-import cv2
-# from scripts.PerceptualSimilarity.models import dist_model as dm
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torchvision import models
+
 import lpips
 # import argparse
 import matplotlib.pyplot as plt
@@ -58,11 +58,43 @@ class FID():
         self.cuda = True
         self.verbose = False
 
-        block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[self.dims]
-        self.model = InceptionV3([block_idx])
+        inception = models.inception_v3(weights=models.Inception_V3_Weights.IMAGENET1K_V1)
+        self.inception_blocks = nn.Sequential(
+            inception.Conv2d_1a_3x3,
+            inception.Conv2d_2a_3x3,
+            inception.Conv2d_2b_3x3,
+            nn.MaxPool2d(kernel_size=3, stride=2),
+            inception.Conv2d_3b_1x1,
+            inception.Conv2d_4a_3x3,
+            nn.MaxPool2d(kernel_size=3, stride=2),
+            inception.Mixed_5b,
+            inception.Mixed_5c,
+            inception.Mixed_5d,
+            inception.Mixed_6a,
+            inception.Mixed_6b,
+            inception.Mixed_6c,
+            inception.Mixed_6d,
+            inception.Mixed_6e,
+            inception.Mixed_7a,
+            inception.Mixed_7b,
+            inception.Mixed_7c,
+            nn.AdaptiveAvgPool2d(output_size=(1, 1))
+        )
+
         if self.cuda:
             # TODO: put model into specific GPU
-            self.model.cuda()
+            self.inception_blocks.cuda()
+
+        self.inception_blocks.eval()
+        self.inception_blocks.requires_grad_(False)
+
+    def forward_inception(self, x):
+        x = F.interpolate(x, size=(299, 299), mode='bilinear')
+        x[:, 0] = x[:, 0] * (0.229 / 0.5) + (0.485 - 0.5) / 0.5
+        x[:, 1] = x[:, 1] * (0.224 / 0.5) + (0.456 - 0.5) / 0.5
+        x[:, 2] = x[:, 2] * (0.225 / 0.5) + (0.406 - 0.5) / 0.5
+        out = self.inception_blocks(x)
+        return out
 
     def __call__(self, images, gt_images):
         """ images:  list of the generated image. The values must lie between 0 and 1.
@@ -79,7 +111,7 @@ class FID():
         return fid_value
 
     def calculate_from_disk(self, generated_path, gt_path, img_size):
-        """ 
+        """
         """
         # if not os.path.exists(gt_path):
         #     raise RuntimeError('Invalid path: %s' % gt_path)
@@ -98,17 +130,7 @@ class FID():
         return fid_value
 
     def compute_statistics_of_path(self, path, verbose, img_size):
-        #
-        # size_flag = '{}_{}'.format(img_size[0], img_size[1])
-        # npz_file = os.path.join(path, size_flag + '_statistics.npz')
-        # if os.path.exists(npz_file):
-        #     f = np.load(npz_file)
-        #     m, s = f['mu'][:], f['sigma'][:]
-        #     f.close()
-        #
-        # else:
-        # img_gt = Image.open(str(fn)).convert("RGB").resize(img_size, Image.BICUBIC) / 255.
-        # path = pathlib.Path(path)
+
         files = path #list(path.glob('*.jpg')) + list(path.glob('*.png'))
         imgs = (np.array(
             [np.array(Image.open(str(fn)).resize(img_size, Image.BICUBIC)) / 255. for fn in
@@ -165,7 +187,7 @@ class FID():
            activations of the given tensor when feeding inception with the
            query tensor.
         """
-        self.model.eval()
+        self.inception_blocks .eval()
 
         d0 = images.shape[0]
         if self.batch_size > d0:
@@ -189,12 +211,12 @@ class FID():
             if self.cuda:
                 batch = batch.cuda()
 
-            pred = self.model(batch)[0]
+            pred = self.forward_inception(batch)
 
             # If model output is not scalar, apply global spatial average pooling.
             # This happens if you choose a dimensionality not equal 2048.
-            if pred.shape[2] != 1 or pred.shape[3] != 1:
-                pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
+            # if pred.shape[2] != 1 or pred.shape[3] != 1:
+            #     pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
 
             pred_arr[start:end] = pred.cpu().data.numpy().reshape(self.batch_size, -1)
 
@@ -213,10 +235,10 @@ class FID():
         -- mu1   : Numpy array containing the activations of a layer of the
                    inception net (like returned by the function 'get_predictions')
                    for generated samples.
-        -- mu2   : The sample mean over activations, precalculated on an 
+        -- mu2   : The sample mean over activations, precalculated on an
                    representive data set.
         -- sigma1: The covariance matrix over activations for generated samples.
-        -- sigma2: The covariance matrix over activations, precalculated on an 
+        -- sigma2: The covariance matrix over activations, precalculated on an
                    representive data set.
         Returns:
         --   : The Frechet Distance.
@@ -354,6 +376,7 @@ class Reconstruction_Metrics():
                 print(
                     str(index) + ' images processed',
                     "PSNR: %.4f" % round(np.mean(psnr), 4),
+                    "SSIM: %.4f" % round(np.mean(ssim), 4),
                     "SSIM_256: %.4f" % round(np.mean(ssim_256), 4),
                     "MAE: %.4f" % round(np.mean(mae), 4),
                     "l1: %.4f" % round(np.mean(l1), 4),
