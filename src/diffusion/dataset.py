@@ -84,58 +84,27 @@ class FPDM_Dataset(Dataset):
         self.transform_totensor = transforms.ToTensor()
         self.transform_normalize = transforms.Normalize([0.5], [0.5])
 
-        # self.kpt_param = {}
-        # self.kpt_param['offset'] = 40
-        # self.kpt_param['stickwidth'] = 4
-        # self.kpt_param['anno_width'] = 176
-        # self.kpt_param['anno_height'] = 256
-        # self.PK = ProcessingKeypoints()
+        self.set_kpt_parm()
 
     def __len__(self):
         return len(self.data)
 
-    def transforms(self, source_img, target_img, s_keypoint, t_keypoint):
+    def set_kpt_parm(self):
+        if 'deepfashion' in self.image_root_path:
+            self.kpt_param = {}
+            self.kpt_param['offset'] = 40
+            self.kpt_param['stickwidth'] = 4
+            self.kpt_param['anno_width'] = 176
+            self.kpt_param['anno_height'] = 256
+        self.PK = ProcessingKeypoints()
+    def transforms(self, source_img, target_img, t_keypoint):
         # Random crop
-        # 예외, text, 너무 작은
-        t_kpt_pad = None
-        if random.random() < 0.6:  # 0.5
-            if random.random() < 0.5:  # 0.5
-                crop = transforms.RandomResizedCrop(self.model_img_size)
-                # _sclae = np.random.choice([0.7, 0.75, 0.8, 0.85, 0.9, 0.95])
-                params = crop.get_params(source_img, scale=(0.7, 1), ratio=(1.0, 1.0))
-                source_img = transforms.functional.crop(source_img, *params)
-                source_img = transforms.functional.resize(source_img, crop.size[::-1])
-            else:
-                if np.isin(-1, s_keypoint):
-                    # s_pad_val = np.random.choice(int(self.model_img_size[0] * 0.4 // 2))
-                    _sclae = np.random.choice([0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1])
-                    s_pad_val = int(self.model_img_size[0] * _sclae // 2)
-                    source_img = transforms.Pad(s_pad_val, fill=0, padding_mode="constant")(source_img)
-                    source_img = transforms.functional.resize(source_img, self.model_img_size[::-1])
-
-        if random.random() < 0.6:
-            if random.random() < 0.5:  # 0.5
-                crop = transforms.RandomResizedCrop(self.model_img_size)
-                params = crop.get_params(source_img, scale=(0.7, 1), ratio=(1.0, 1.0))
-                target_img = transforms.functional.crop(target_img, *params)
-                target_img = transforms.functional.resize(target_img, crop.size[::-1])
-                kpt_mask = t_keypoint == -1
-                t_keypoint = self.kpt_cropresize(t_keypoint, params)
-                t_keypoint[kpt_mask] = -1
-            else:
-                t_keypoint = np.concatenate((t_keypoint, [[0,0], self.model_img_size])) # pad 위치를 알기 위하여
-                if np.isin(-1, t_keypoint):  # 전체 형상일 경우 augmentation하지 않음  # 0.5
-                    # t_pad_val = np.random.choice(int(self.model_img_size[0] * 0.4 // 2))
-                    _sclae = np.random.choice([0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1])
-                    t_pad_val = int(self.model_img_size[0] * _sclae // 2)
-                    target_img = transforms.Pad(t_pad_val, fill=0, padding_mode="constant")(target_img)
-                    target_img = transforms.functional.resize(target_img, self.model_img_size[::-1])
-                    kpt_mask = t_keypoint == -1
-                    _kpt = t_keypoint + t_pad_val
-                    _kpt = self.kpt_resize(_kpt, t_pad_val, self.model_img_size)
-                    _kpt[kpt_mask] = -1
-                    t_keypoint = _kpt[:-2,:]
-                    t_kpt_pad = _kpt[-2:,:]
+        # t_keypoint
+        if random.random() < 0.9:
+            np.array(self.model_img_size) * 0.01
+            kpt_shape = t_keypoint.shape
+            random_noise = np.random.normal(0, 1, kpt_shape[0]*kpt_shape[1]).reshape(kpt_shape)
+            t_keypoint = t_keypoint + random_noise
 
         if random.random() < 0.5:
             source_img = transforms.functional.hflip(source_img)
@@ -144,19 +113,7 @@ class FPDM_Dataset(Dataset):
             t_keypoint[:, 0] = self.model_img_size[0] - t_keypoint[:, 0]
             t_keypoint[pt_mask] = -1
 
-        # if random.random() < 0.0:  # 0.8
-        #     jitter = transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.1)
-        #     params = jitter.get_params(jitter.brightness, jitter.contrast, jitter.saturation, jitter.hue)
-        #
-        #     for i in np.array(params[0]):
-        #         source_img = self.ColorJitter_functions[i](source_img, params[i + 1])
-        #         target_img = self.ColorJitter_functions[i](target_img, params[i + 1])
-        #
-        # if random.random() < 0.0:  # 0.2
-        #     target_img = transforms.functional.rgb_to_grayscale(target_img, num_output_channels=3)
-        #     source_img = transforms.functional.rgb_to_grayscale(source_img, num_output_channels=3)
-
-        return source_img, target_img, t_keypoint, t_kpt_pad
+        return source_img, target_img, t_keypoint
 
     def __getitem__(self, idx):
         item = self.data[idx]
@@ -167,15 +124,21 @@ class FPDM_Dataset(Dataset):
         t_img_path = os.path.join(self.image_root_path, item["target_image"])
         t_img = Image.open(t_img_path).resize(self.img_size, Image.BICUBIC)
 
-        t_pose = Image.open(t_img_path.replace("/img/", "/pose_img/")).resize(self.img_size, Image.BICUBIC)
+
 
         s_img = s_img.resize(self.model_img_size, Image.BICUBIC)
         t_img = t_img.resize(self.model_img_size, Image.BICUBIC)
-        t_pose = t_pose.resize(self.model_img_size, Image.BICUBIC)
 
-        # t_pose_path = t_img_path.replace('img', 'pose_img').replace('.jpg', '.txt')
-        # t_keypoint = np.loadtxt(t_pose_path)
-        # t_keypoint = self.PK.trans_keypoins(t_keypoint, self.model_img_size[::-1], self.kpt_param)
+        # t_pose = Image.open(t_img_path.replace("/img/", "/pose_img/")).resize(self.img_size, Image.BICUBIC)
+        # t_pose = t_pose.resize(self.model_img_size, Image.BICUBIC)
+
+        t_pose_path = t_img_path.replace('img', 'pose').replace('.jpg', '.txt')
+        t_keypoint = np.loadtxt(t_pose_path)
+        t_keypoint = self.PK.trans_keypoins(t_keypoint, self.model_img_size[::-1], self.kpt_param)
+        if self.phase == 'train':
+            s_img, t_img, t_keypoint = self.transforms(s_img, t_img, t_keypoint)
+        t_pose = self.PK.draw_img(t_keypoint, self.model_img_size[::-1], self.kpt_param)
+
         # s_pose_path = s_img_path.replace('img', 'pose').replace('.jpg', '.txt')
         # s_keypoint = np.loadtxt(s_pose_path)
         # s_keypoint = self.PK.trans_keypoins(s_keypoint, self.model_img_size[::-1], self.kpt_param)

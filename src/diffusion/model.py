@@ -30,6 +30,7 @@ import math
 from torch.optim.lr_scheduler import LRScheduler
 import random
 import matplotlib.pyplot as plt
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 class WarmupStepLR(LRScheduler):
     def __init__(self, optimizer, warmup_steps, step_size, gamma=0.1, base_lr=1e-3, last_epoch=-1):
@@ -58,8 +59,9 @@ class SrcImage_ProjModel(torch.nn.Module):
         self.net = nn.Sequential(
             nn.Linear(in_dim, hidden_dim),
             nn.GELU(),
+            # nn.BatchNorm2d(hidden_dim),
             nn.Dropout(dropout),
-            nn.LayerNorm(hidden_dim),
+            # nn.LayerNorm(hidden_dim),
             nn.Linear(hidden_dim, out_dim),
             nn.Dropout(dropout)
         )
@@ -77,6 +79,7 @@ class FusionPatch_ProjModel(torch.nn.Module):
         self.net = nn.Sequential(
             nn.Linear(in_dim, hidden_dim),
             nn.GELU(),
+            # nn.BatchNorm2d(hidden_dim),
             nn.Dropout(dropout),
             nn.LayerNorm(hidden_dim),
             nn.Linear(hidden_dim, out_dim),
@@ -90,8 +93,8 @@ def zero_module(module):
     for p in module.parameters():
         nn.init.zeros_(p)
     return module
-
-# class Patch_embedding_proj(nn.Module):
+#
+# class ControlNetConditioningEmbedding(nn.Module):
 #     """
 #     Quoting from https://arxiv.org/abs/2302.05543: "Stable Diffusion uses a pre-processing method similar to VQ-GAN
 #     [11] to convert the entire dataset of 512 × 512 images into smaller 64 × 64 “latent images” for stabilized
@@ -103,36 +106,40 @@ def zero_module(module):
 #
 #     def __init__(
 #         self,
-#         in_dim: int = 1024,
-#         hidden_dim: int = 768,
-#         out_dim: int = 320,
-#         dropout: float = 0.2,
-#         upsmaple_size: int = 4
+#         conditioning_embedding_channels: int,
+#         conditioning_channels: int = 3,
+#         block_out_channels: Tuple[int, ...] = (16, 32, 96, 256),
 #     ):
 #         super().__init__()
 #
-#         self.hidden_dim = hidden_dim
-#         self.net = nn.Sequential(
-#             nn.Linear(in_dim, self.hidden_dim),
-#             nn.GELU(),
-#             nn.Dropout(dropout),
-#             nn.LayerNorm(self.hidden_dim),
-#             nn.Linear(self.hidden_dim, self.hidden_dim),
-#             nn.GELU(),
-#             nn.Dropout(dropout),
-#             nn.LayerNorm(self.hidden_dim),
-#         )
-#         self.upsample = nn.Upsample(scale_factor=upsmaple_size, mode='nearest')
-#         self.conv_out = nn.Conv2d(self.hidden_dim, out_dim, kernel_size=1, padding=0)
+#         self.conv_in = nn.Conv2d(conditioning_channels, block_out_channels[0], kernel_size=3, padding=1)
 #
-#     def forward(self, embed):
-#         embed = self.net(embed)
-#         embed = embed.transpose(2, 1)
-#         embed = embed.view(-1, self.hidden_dim, 16, 16)
-#         embed = self.upsample(embed)
-#         embed = self.conv_out(embed)
-#         return embed
-
+#         self.blocks = nn.ModuleList([])
+#
+#         for i in range(len(block_out_channels) - 1):
+#             channel_in = block_out_channels[i]
+#             channel_out = block_out_channels[i + 1]
+#             self.blocks.append(nn.Sequential(nn.Conv2d(channel_in, channel_in, kernel_size=3, padding=1),
+#                                              nn.SiLU(),
+#                                              nn.BatchNorm2d(channel_in),
+#                                              nn.Dropout(0.2)))
+#             self.blocks.append(nn.Sequential(nn.Conv2d(channel_in, channel_out, kernel_size=3, padding=1, stride=2)))
+#
+#         self.conv_out = zero_module(
+#             nn.Conv2d(block_out_channels[-1], conditioning_embedding_channels, kernel_size=3, padding=1)
+#         )
+#
+#     def forward(self, conditioning):
+#         embedding = self.conv_in(conditioning)
+#         embedding = F.silu(embedding)
+#
+#         for block in self.blocks:
+#             embedding = block(embedding)
+#             embedding = F.silu(embedding)
+#
+#         embedding = self.conv_out(embedding)
+#
+#         return embedding
 
 class SDModel(torch.nn.Module):
     """SD model with image prompt"""
