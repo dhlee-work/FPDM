@@ -61,7 +61,7 @@ class SrcImage_ProjModel(torch.nn.Module):
             nn.GELU(),
             # nn.BatchNorm2d(hidden_dim),
             nn.Dropout(dropout),
-            # nn.LayerNorm(hidden_dim),
+            nn.LayerNorm(hidden_dim),
             nn.Linear(hidden_dim, out_dim),
             nn.Dropout(dropout)
         )

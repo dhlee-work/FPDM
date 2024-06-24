@@ -14,8 +14,10 @@ lpips_val = 0
 ssim = 0
 psnr = 0
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-# fid = FID()
+fid = FID()
 lpips_obj = LPIPS()
+lpips_obj.model.to(device)
+
 rec = Reconstruction_Metrics()
 
 # real_path = './datasets/deepfashing/img'
@@ -29,10 +31,10 @@ real_path = ['_'.join(i.split('_')[:-1]).replace('generate','original_img') + '.
 
 
 #
-_img_size = (352, 512) # (176, 256) (352, 512)
-# lpips_obj.model.to(device)
-# fid_val = fid.calculate_from_disk(distorated_list, real_path, img_size=_img_size) # (176, 256) (352, 512)
-# lpips_val = lpips_obj.calculate_from_disk(distorated_list, real_path, img_size=_img_size, sort=False)
+_img_size = (176, 256) # (176, 256) (352, 512)
+
+fid_val = fid.calculate_from_disk(distorated_list, real_path, img_size=_img_size) # (176, 256) (352, 512)
+lpips_val = lpips_obj.calculate_from_disk(distorated_list, real_path, img_size=_img_size, sort=False)
 REC = rec.calculate_from_disk(distorated_list, real_path, None,  img_size=_img_size, sort=False, debug=False)
 #
 fid_val = round(fid_val, 3)

@@ -97,6 +97,7 @@ class FPDM_Dataset(Dataset):
             self.kpt_param['anno_width'] = 176
             self.kpt_param['anno_height'] = 256
         self.PK = ProcessingKeypoints()
+
     def transforms(self, source_img, target_img, t_keypoint):
         # Random crop
         # t_keypoint
@@ -119,14 +120,12 @@ class FPDM_Dataset(Dataset):
         item = self.data[idx]
 
         s_img_path = os.path.join(self.image_root_path, item["source_image"])
-        s_img = Image.open(s_img_path).resize(self.img_size, Image.BICUBIC)
+        s_img = Image.open(s_img_path)# .resize(self.img_size, Image.BICUBIC)
 
         t_img_path = os.path.join(self.image_root_path, item["target_image"])
-        t_img = Image.open(t_img_path).resize(self.img_size, Image.BICUBIC)
+        t_img = Image.open(t_img_path)# .resize(self.img_size, Image.BICUBIC)
 
-
-
-        s_img = s_img.resize(self.model_img_size, Image.BICUBIC)
+        # s_img = s_img.resize(self.model_img_size, Image.BICUBIC)
         t_img = t_img.resize(self.model_img_size, Image.BICUBIC)
 
         # t_pose = Image.open(t_img_path.replace("/img/", "/pose_img/")).resize(self.img_size, Image.BICUBIC)
@@ -139,28 +138,12 @@ class FPDM_Dataset(Dataset):
             s_img, t_img, t_keypoint = self.transforms(s_img, t_img, t_keypoint)
         t_pose = self.PK.draw_img(t_keypoint, self.model_img_size[::-1], self.kpt_param)
 
-        # s_pose_path = s_img_path.replace('img', 'pose').replace('.jpg', '.txt')
-        # s_keypoint = np.loadtxt(s_pose_path)
-        # s_keypoint = self.PK.trans_keypoins(s_keypoint, self.model_img_size[::-1], self.kpt_param)
-        # t_kpt_pad = None
-        # if self.phase == 'train':
-        #     s_img, t_img, t_keypoint, t_kpt_pad = self.transforms(s_img, t_img, s_keypoint, t_keypoint)
-        # t_pose = self.PK.draw_img(t_keypoint, self.model_img_size[::-1], self.kpt_param)
-        # if t_kpt_pad is not None:
-        #     t_pose = self.add_kptpad(t_pose, t_kpt_pad)
-
-        processed_s_img = (self.image_processor(images=s_img,
-                                                return_tensors="pt").pixel_values).squeeze(dim=0)
-        processed_t_pose = (self.image_processor(images=t_pose,
-                                                 return_tensors="pt").pixel_values).squeeze(dim=0)
+        processed_s_img = (self.image_processor(images=s_img, return_tensors="pt").pixel_values).squeeze(dim=0)
+        processed_t_pose = (self.image_processor(images=t_pose, return_tensors="pt").pixel_values).squeeze(dim=0)
 
         trans_t_img = self.transform_normalize(self.transform_totensor(t_img))
         trans_t_pose = self.transform_totensor(t_pose)
 
-        # if random.random() < self.pose_erase_rate:
-        #     params = self.random_erase.get_params(trans_t_pose, scale=(0.05, 0.5), ratio=(0.3, 3.3))
-        #     i, j, h, w, _ = params
-        #     trans_t_pose[:, i:i + h, j:j + w] = 0
 
         if random.random() < self.pose_drop_rate:
             processed_t_pose = torch.zeros(processed_t_pose.shape)

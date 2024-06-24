@@ -1,4 +1,4 @@
-project_name: 'sign-fusion-CLIP-b48-p005-r10-epoch3-lr1e-6-wd1e-4'
+project_name: 'sign-fusion-CLIP-b48-p005-r10-epoch3-lr1e-5-wd1e-4'
 root_path: './dataset/multi/'
 device: [0]
 phase: 'train'
@@ -11,7 +11,7 @@ combiner_hidden_dim: 768  # large 768 base 512
 img_pose_drop_rate: 0.0
 thr_ratio: 1.0
 max_epochs: 3
-lr: 0.000001
+lr: 0.00001
 weight_decay: 0.0001
 accumulate_grad_batches: 1
 temperature: 0.07

@@ -474,7 +474,7 @@ class LPIPS():
         result = self.model.forward(image_1, image_2)
         return result
 
-    def calculate_from_disk(self, path_1, path_2, img_size, batch_size=64, verbose=False, sort=True):
+    def calculate_from_disk(self, path_1, path_2, img_size, batch_size=4, verbose=False, sort=True):
 
         if sort:
             files_1 = sorted(get_image_list(path_1))
@@ -501,10 +501,10 @@ class LPIPS():
             end = start + batch_size
 
             imgs_1 = np.array(
-                [np.array(Image.open(fn).convert("RGB").resize(img_size,Image.BICUBIC))/255. for fn
+                [np.array(Image.open(fn).convert("RGB").resize(img_size, Image.BICUBIC))/255. for fn
                  in files_1[start:end]])
             imgs_2 = np.array(
-                [np.array(Image.open(fn).convert("RGB").resize(img_size,Image.BICUBIC))/255. for fn
+                [np.array(Image.open(fn).convert("RGB").resize([176, 256], Image.BICUBIC).resize(img_size, Image.BICUBIC))/255. for fn #
                  in files_2[start:end]])
 
             imgs_1 = imgs_1.transpose((0, 3, 1, 2))

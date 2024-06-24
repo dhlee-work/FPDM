@@ -503,7 +503,6 @@ class FPDM_DiffusionPipeline(DiffusionPipeline):
                         callback(i, t, latents)
 
         image = self.vae.decode(latents / self.vae.config.scaling_factor, return_dict=False)[0]  # .to(torch.float)
-
         has_nsfw_concept = None
         do_denormalize = [True] * image.shape[0]
         image = self.image_processor.postprocess(image, output_type=output_type, do_denormalize=do_denormalize)

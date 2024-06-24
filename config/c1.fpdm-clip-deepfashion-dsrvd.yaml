@@ -1,4 +1,4 @@
-project_name: 'deepfashion-diffusion-clip-init-wd001-lr1e-4-b32-cum2-size512-noaug-steplr'
+project_name: 'deepfashion-diffusion-clip-init-wd00-lr1e-4-b32-cum8-size512-noaug-steplr'
 #root_path : './dataset/deepfashion/'
 disable_logger: False
 mode: 'client'
@@ -7,14 +7,14 @@ device: [0]
 batch_size: 32 # 64
 num_workers: 16
 lr: 0.0001
-accumulate_grad_batches: 2
+accumulate_grad_batches: 8
 temperature: 0.07
-weight_decay: 0.01
+weight_decay: 0.0
 scheduler_t0: 100
 scheduler_t_mult: 2
 scheduler_eta_max: 0.0001 # 0.0001
 scheduler_t_up: 5
-scheduler_step_size: 25
+scheduler_step_size: 30
 scheduler_gamma: 0.1
 max_epochs: 100
 data_root_path: './dataset/deepfashion'
@@ -51,7 +51,7 @@ proj_embd_concat: true
 fusion_patch_embed_ahead: false
 trained_model_name: null # '2024-06-10T14-09-37' # null # '2024-06-05T00-35-10' #null # '2024-05-30T18-59-18' # '2024-05-28T10-21-27' # null
 pretrained_model_name_or_path: 'stabilityai/stable-diffusion-2-1-base'
-fusion_model_path: './logs/deepfashion-fusion-CLIP-b48-p005-r10-epoch3-lr1e-5-wd1e-4/2024-06-07T15-11-03/last.ckpt' # './logs/deepfashion-fusion-CLIP-patch-learning/2024-05-28T20-29-57/last.ckpt'
+fusion_model_path: './logs/deepfashion-fusion-CLIP-b48-p005-r10-epoch3-lr1e-5-wd1e-4/2024-06-21T07-49-27/last.ckpt' # './logs/deepfashion-fusion-CLIP-patch-learning/2024-05-28T20-29-57/last.ckpt'
 visualize_images: true
 calculate_metrics: true
 loss_type: 'mse_loss'  # mse_loss, shrinkage_loss

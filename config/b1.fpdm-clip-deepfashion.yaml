@@ -1,4 +1,4 @@
-project_name: 'deepfashion-fusion-CLIP-b48-r10-p005-lr'
+project_name: 'deepfashion-fusion-CLIP-b48-p005-r10-epoch3-lr1e-5-wd1e-4'
 root_path: './dataset/deepfashion/'
 device: [0]
 phase: 'train'
@@ -10,17 +10,12 @@ num_workers: 16
 combiner_hidden_dim: 768  # large 768 base 512
 img_pose_drop_rate: 0.0
 thr_ratio: 1.0
-lr: 0.0
-accumulate_grad_batches: 1
-scheduler_t0: 10
-scheduler_t_mult: 2
-scheduler_eta_max: 0.00001
-scheduler_t_up: 2
-scheduler_gamma: 0.5
-temperature: 0.07
+max_epochs: 3
+lr: 0.00001
 weight_decay: 0.0001
-max_epochs: 10
-img_size: [176, 256] #[256, 256]
+accumulate_grad_batches: 1
+temperature: 0.07
+img_size: [224, 224] #[256, 256]
 lambda_l1: 0.0001
 encoder_type: 'clip' # 'clip'
 attn_hidden_dim: 1024  # large-1024 base 768

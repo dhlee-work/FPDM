@@ -175,7 +175,7 @@ def resize_image(image_list, resized_dirname, ratio):
         img = cv2.imread(c_path)
         h, w, c = img.shape
         img = cv2.resize(img, (int(w*ratio), int(h*ratio)))
-
+        img = cv2.resize(img, (int(512), int(512)))
         dir_path = os.path.split(s_path)[0]
         if not os.path.exists(dir_path):
             os.makedirs(dir_path, exist_ok=True)
@@ -230,9 +230,9 @@ def run_preprcessing_sign(dataset_dir):
     print('process finished !! ')
 
 root_dir = './dataset'
-dataset = 'sign'# 'sign' #'market1501' # sign one_video_test
+dataset = 'deepfashion'# 'sign' #'market1501' # sign one_video_test
 dataset_type = 'video_test' #'video_test
-resized_dirname = 'resized_img'
+resized_dirname = 'resized512_img'
 dataset_dir = os.path.join(root_dir, dataset)
 
 if dataset == 'deepfashion':
