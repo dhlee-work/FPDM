@@ -279,35 +279,6 @@ class FusionModel(pl.LightningModule):
             encoded_target_pose = self.pose_encoder(target_pose)
             encoded_target = self.img_encoder(target_imgs)
 
-        # elif self.hparams.learning_encoder_type == 'each':
-        #     if batch_idx % 3 == 0:
-        #         self.img_encoder.requires_grad_(True)
-        #         encoded_source = self.img_encoder(source_imgs)
-        #         self.img_encoder.requires_grad_(False)
-        #         encoded_target = self.img_encoder(target_imgs)
-        #         encoded_target_pose = self.pose_encoder(target_pose)
-        #     if batch_idx % 3 == 1:
-        #         self.img_encoder.requires_grad_(True)
-        #         encoded_target_pose = self.pose_encoder(target_pose)
-        #         self.img_encoder.requires_grad_(False)
-        #         encoded_source = self.img_encoder(source_imgs)
-        #         encoded_target = self.img_encoder(target_imgs)
-        #     if batch_idx % 3 == 2:
-        #         self.img_encoder.requires_grad_(True)
-        #         encoded_target = self.img_encoder(target_imgs)
-        #         self.img_encoder.requires_grad_(False)
-        #         encoded_source = self.img_encoder(source_imgs)
-        #         encoded_target_pose = self.pose_encoder(target_pose)
-        #     self.img_encoder.requires_grad_(True)
-        #
-        # else:
-        #     print('learn only src and pose grad.')
-        #     encoded_source = self.img_encoder(source_imgs)
-        #     encoded_target_pose = self.pose_encoder(target_pose)
-        #     self.img_encoder.requires_grad_(False)
-        #     encoded_target = self.img_encoder(target_imgs)
-        #     self.img_encoder.requires_grad_(True)
-
         if self.hparams.encoder_type == 'clip':
             source_img_feats = encoded_source.image_embeds
             targets_img_feats = encoded_target.image_embeds

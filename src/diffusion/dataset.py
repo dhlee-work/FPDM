@@ -15,32 +15,21 @@ import matplotlib.pyplot as plt
 
 
 def FPDM_Collate_fn(data):
-    processed_source_image = torch.stack([example["processed_s_img"] for example in data])
-    # processed_source_image = processed_source_image.to(memory_format=torch.contiguous_format).float()
-
-    # processed_target_image = torch.stack([example["processed_t_img"] for example in data])
-    # processed_target_image = processed_target_image.to(memory_format=torch.contiguous_format).float()
-
-    processed_target_pose = torch.stack([example["processed_t_pose"] for example in data])
-    # processed_pose_image = processed_pose_image.to(memory_format=torch.contiguous_format).float()
-
-    # source_image = torch.stack([example["trans_s_img"] for example in data])
-    # source_image = source_image.to(memory_format=torch.contiguous_format).float()
-
+    src_processed_source_image = torch.stack([example["src_processed_s_img"] for example in data])
+    fusion_processed_source_image = torch.stack([example["fusion_processed_s_img"] for example in data])
+    fusion_processed_target_pose = torch.stack([example["fusion_processed_t_pose"] for example in data])
     target_pose = torch.stack([example["trans_t_pose"] for example in data])
-    # target_pose = target_pose.to(memory_format=torch.contiguous_format).float()
-
+    source_pose = torch.stack([example["trans_s_pose"] for example in data])
     target_image = torch.stack([example["trans_t_img"] for example in data])
-    # target_image = target_image.to(memory_format=torch.contiguous_format).float()
 
     return {
-        "processed_source_image": processed_source_image,
-        "processed_target_pose": processed_target_pose,
-        # "source_image": source_image,
+        "src_processed_source_image" : src_processed_source_image,
+        "fusion_processed_source_image": fusion_processed_source_image,
+        "fusion_processed_target_pose": fusion_processed_target_pose,
+        "source_pose": source_pose,
         "target_pose": target_pose,
         "target_image": target_image,
     }
-
 
 class FPDM_Dataset(Dataset):
     def __init__(
@@ -49,6 +38,7 @@ class FPDM_Dataset(Dataset):
             image_root_path,
             phase='train',
             src_encoder_path=None,
+            fusion_encoder_path=None,
             model_img_size=(512, 512),
             img_size=(512, 512),
             imgs_drop_rate=0.0,
@@ -68,12 +58,13 @@ class FPDM_Dataset(Dataset):
         self.pose_drop_rate = pose_drop_rate
         self.pose_erase_rate = pose_erase_rate
         self.src_encoder_path = src_encoder_path
-        self.image_processor = AutoImageProcessor.from_pretrained(self.src_encoder_path)  # 앞으로 빼기
-        self.image_processor.size['shortest_edge'] = 224
+        self.fusion_encoder_path = fusion_encoder_path
+        self.src_image_processor = AutoImageProcessor.from_pretrained(self.src_encoder_path)  # 앞으로 빼기
+        self.src_image_processor.size['shortest_edge'] = 512
+        self.src_image_processor.do_center_crop = False
 
-        # self.image_src_processor = AutoImageProcessor.from_pretrained(self.src_encoder_path)  # 앞으로 빼기
-        # self.image_src_processor.size['shortest_edge'] = 512
-        # self.image_src_processor.crop_size = {"height": 512, "width": 512}
+        self.fusion_image_processor = AutoImageProcessor.from_pretrained(self.fusion_encoder_path)  # 앞으로 빼기
+        self.fusion_image_processor.do_center_crop = False
 
         self.random_erase = transforms.RandomErasing()
         self.ColorJitter_functions = {0: transforms.functional.adjust_brightness,
@@ -98,13 +89,18 @@ class FPDM_Dataset(Dataset):
             self.kpt_param['anno_height'] = 256
         self.PK = ProcessingKeypoints()
 
-    def transforms(self, source_img, target_img, t_keypoint):
+    def transforms(self, source_img, target_img, s_keypoint, t_keypoint):
         # Random crop
         # t_keypoint
         if random.random() < 1.0:
             kpt_shape = t_keypoint.shape
             random_noise = np.random.normal(0, 1, kpt_shape[0]*kpt_shape[1]).reshape(kpt_shape)
             t_keypoint = t_keypoint + random_noise
+
+        if random.random() < 1.0:
+            kpt_shape = s_keypoint.shape
+            random_noise = np.random.normal(0, 1, kpt_shape[0]*kpt_shape[1]).reshape(kpt_shape)
+            s_keypoint = s_keypoint + random_noise
 
         if random.random() < 0.5:
             source_img = transforms.functional.hflip(source_img)
@@ -113,36 +109,13 @@ class FPDM_Dataset(Dataset):
             t_keypoint[:, 0] = self.model_img_size[0] - t_keypoint[:, 0]
             t_keypoint[pt_mask] = -1
 
-        # if random.random() < 0.0:  # 0.5
-        #     crop = transforms.RandomResizedCrop(self.model_img_size)
-        #     params = crop.get_params(source_img, scale=(0.8, 1), ratio=(1.0, 1.0))
-        #     source_img = transforms.functional.crop(source_img, *params)
-        #     source_img = transforms.functional.resize(source_img, crop.size[::-1])
-        #
-        #
-        # if random.random() < 0.0:  # 0.5
-        #     crop = transforms.RandomResizedCrop(self.model_img_size)
-        #     params = crop.get_params(source_img, scale=(0.8, 1), ratio=(1.0, 1.0))
-        #     target_img = transforms.functional.crop(target_img, *params)
-        #     target_img = transforms.functional.resize(target_img, crop.size[::-1])
-        #     kpt_mask = t_keypoint == -1
-        #     t_keypoint = self.kpt_cropresize(t_keypoint, params)
-        #     t_keypoint[kpt_mask] = -1
-        #     t_pose = self.PK.draw_img(t_keypoint, self.model_img_size[::-1], self.kpt_param)
-        # else:
-        #     t_pose = self.PK.draw_img(t_keypoint, self.model_img_size[::-1], self.kpt_param)
+            pt_mask = s_keypoint == -1
+            s_keypoint[:, 0] = self.model_img_size[0] - s_keypoint[:, 0]
+            s_keypoint[pt_mask] = -1
 
         t_pose = self.PK.draw_img(t_keypoint, self.model_img_size[::-1], self.kpt_param)
-
-        # if random.random() < 1.0:  # 0.8
-        #     jitter = transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1)
-        #     params = jitter.get_params(jitter.brightness, jitter.contrast, jitter.saturation, jitter.hue)
-        #
-        #     for i in np.array(params[0]):
-        #         source_img = self.ColorJitter_functions[i](source_img, params[i + 1])
-        #         target_img = self.ColorJitter_functions[i](target_img, params[i + 1])
-
-        return source_img, target_img, t_pose
+        s_pose = self.PK.draw_img(s_keypoint, self.model_img_size[::-1], self.kpt_param)
+        return source_img, target_img, s_pose, t_pose
 
     def __getitem__(self, idx):
         item = self.data[idx]
@@ -152,36 +125,44 @@ class FPDM_Dataset(Dataset):
 
         t_img_path = os.path.join(self.image_root_path, item["target_image"])
         t_img = Image.open(t_img_path)# .resize(self.img_size, Image.BICUBIC)
-
-        # s_img = s_img.resize(self.model_img_size, Image.BICUBIC)
         t_img = t_img.resize(self.model_img_size, Image.BICUBIC)
+
 
         # t_pose = Image.open(t_img_path.replace("/img/", "/pose_img/")).resize(self.img_size, Image.BICUBIC)
         # t_pose = t_pose.resize(self.model_img_size, Image.BICUBIC)
 
         t_pose_path = t_img_path.replace('img', 'pose').replace('.jpg', '.txt')
         t_keypoint = np.loadtxt(t_pose_path)
-        t_keypoint = self.PK.trans_keypoins(t_keypoint, self.model_img_size[::-1], self.kpt_param)
-        if self.phase == 'train':
-            s_img, t_img, t_pose = self.transforms(s_img, t_img, t_keypoint)
-        else:
-            t_pose = self.PK.draw_img(t_keypoint, self.model_img_size[::-1], self.kpt_param)
+        t_keypoint = self.PK.trans_keypoins(t_keypoint, [550, 375], self.kpt_param)
 
-        processed_s_img = (self.image_processor(images=s_img, return_tensors="pt").pixel_values).squeeze(dim=0)
-        processed_t_pose = (self.image_processor(images=t_pose, return_tensors="pt").pixel_values).squeeze(dim=0)
+        s_pose_path = s_img_path.replace('img', 'pose').replace('.jpg', '.txt')
+        s_keypoint = np.loadtxt(s_pose_path)
+        s_keypoint = self.PK.trans_keypoins(s_keypoint, [550, 375], self.kpt_param)
+        if self.phase == 'train':
+            s_img, t_img, s_pose, t_pose = self.transforms(s_img, t_img, s_keypoint, t_keypoint)
+        else:
+            t_pose = self.PK.draw_img(t_keypoint, [550, 375], self.kpt_param)
+            s_pose = self.PK.draw_img(s_keypoint, [550, 375], self.kpt_param)
 
         trans_t_img = self.transform_normalize(self.transform_totensor(t_img))
-        trans_t_pose = self.transform_totensor(t_pose)
+        trans_t_pose = self.transform_totensor(t_pose.resize(self.model_img_size, Image.BICUBIC))
+        trans_s_pose = self.transform_totensor(s_pose.resize([512, 512], Image.BICUBIC))
 
+        src_processed_s_img = (self.src_image_processor(images=s_img, return_tensors="pt").pixel_values).squeeze(dim=0)
+        fusion_processed_s_img = (self.fusion_image_processor(images=s_img, return_tensors="pt").pixel_values).squeeze(dim=0)
+        fusion_processed_t_pose = (self.fusion_image_processor(images=t_pose.resize([224, 224], Image.BICUBIC),
+                                                               return_tensors="pt").pixel_values).squeeze(dim=0)
 
-        if random.random() < self.pose_drop_rate:
-            processed_t_pose = torch.zeros(processed_t_pose.shape)
+        # if random.random() < self.pose_drop_rate:
+        #     trans_t_pose = torch.zeros(trans_t_pose.shape)
 
         return {
-            "processed_s_img": processed_s_img,
-            "processed_t_pose": processed_t_pose,
+            "src_processed_s_img": src_processed_s_img,
+            "fusion_processed_s_img": fusion_processed_s_img,
+            "fusion_processed_t_pose": fusion_processed_t_pose,
             "trans_t_img": trans_t_img,
             "trans_t_pose": trans_t_pose,
+            "trans_s_pose": trans_s_pose,
         }
 
     def kpt_resize(self, keypoint, pad_val, resize):

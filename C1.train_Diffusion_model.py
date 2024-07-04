@@ -69,6 +69,7 @@ traindataset = FPDM_Dataset(
     model_img_size=config.model_img_size,
     img_size=config.img_size,
     src_encoder_path=config.src_encoder_path,
+    fusion_encoder_path=config.fusion_encoder_path,
     pose_drop_rate=config.pose_drop_rate,
     pose_erase_rate=config.pose_erase_rate
 )
@@ -88,6 +89,7 @@ testdataset = FPDM_Dataset(
     model_img_size=config.model_img_size,
     img_size=config.img_size,  # w h
     src_encoder_path=config.src_encoder_path,
+    fusion_encoder_path=config.fusion_encoder_path,
     pose_drop_rate=0,
     pose_erase_rate=0
 )

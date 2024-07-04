@@ -1,4 +1,4 @@
-project_name: 'deepfashion-fusion-CLIP-b48-p005-r10-epoch10-lr1e-5-wd1e-4'
+project_name: 'deepfashion-fusion-CLIP-b48-p005-r10-epoch5-lr1e-5-wd1e-4'
 root_path: './dataset/deepfashion/'
 device: [0]
 phase: 'train'
