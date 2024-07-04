@@ -188,7 +188,7 @@ class SDModel(torch.nn.Module):
 
         self.fusionpatch_proj_model = FusionPatch_ProjModel(in_dim=self.args.patch_proj_in_dim, hidden_dim=768, out_dim=1024,
                                                    dropout=self.args.proj_drop_rate)
-        self.pose_proj = ControlNetConditioningEmbedding(
+        self.pose_t_proj = ControlNetConditioningEmbedding(
             conditioning_embedding_channels=320,
             block_out_channels=(16, 32, 96, 256),
             conditioning_channels=3)
@@ -251,7 +251,7 @@ class SDModel(torch.nn.Module):
         if self.args.fusion_image_patch_encoder == True and self.args.fusion_patch_embed_ahead == True:
             pose_cond = extra_patch_embeddings_f
         else:
-            pose_cond = self.pose_proj(pose_f)
+            pose_cond = self.pose_t_proj(pose_f)
 
         if self.args.pose_module_drop == True:
             pose_cond = torch.zeros(pose_cond.shape).to(self.unet.device)
@@ -295,10 +295,30 @@ class FPDM(pl.LightningModule):
 
         # fusion model load
         self.fusion_model = FusionModel.load_from_checkpoint(self.hparams.fusion_model_path)
-        self.fusion_model_img_encoder = self.fusion_model.img_encoder
-        self.fusion_model_pose_encoder = self.fusion_model.pose_encoder
-        self.fusion_model_combiner = self.fusion_model.combiner
-        self.fusion_model_attention = self.fusion_model.attention
+        # self.fusion_model.img_encoder = self.fusion_model.img_encoder
+        # self.fusion_model.pose_encoder = self.fusion_model.pose_encoder
+        # self.fusion_model.combiner = self.fusion_model.combiner
+        # self.fusion_model.attention = self.fusion_model.attention
+
+
+
+        if self.hparams.init_src_image_encoder:
+            if self.hparams.src_encoder_type == 'clip':
+                self.src_image_encoder = CLIPVisionModelWithProjection.from_pretrained(self.hparams.src_encoder_path)
+            else:
+                self.src_image_encoder = AutoModel.from_pretrained(self.hparams.src_encoder_path)
+        else:
+            self.src_image_encoder = self.fusion_model.img_encoder
+
+        self.src_image_processor = AutoImageProcessor.from_pretrained(self.hparams.src_encoder_path)  # 앞으로 빼기
+        self.src_image_processor.size['shortest_edge'] = 512
+        self.src_image_processor.do_center_crop = False
+
+        self.fusion_image_processor = AutoImageProcessor.from_pretrained(self.hparams.fusion_encoder_path)  # 앞으로 빼기
+        self.fusion_image_processor.do_center_crop = False
+
+
+
 
         if self.hparams.init_src_image_encoder:
             if self.hparams.src_encoder_type == 'clip':
@@ -315,10 +335,10 @@ class FPDM(pl.LightningModule):
         self.src_image_encoder.requires_grad_(False)
         self.vae.requires_grad_(False)
         self.fusion_model.requires_grad_(False)
-        self.fusion_model_img_encoder.requires_grad_(False)
-        self.fusion_model_pose_encoder.requires_grad_(False)
-        self.fusion_model_combiner.requires_grad_(False)
-        self.fusion_model_attention.requires_grad_(False)
+        # self.fusion_model.img_encoder.requires_grad_(False)
+        # self.fusion_model.pose_encoder.requires_grad_(False)
+        # self.fusion_model.combiner.requires_grad_(False)
+        # self.fusion_model.attention.requires_grad_(False)
 
         self.sd_model = SDModel(unet=self.unet, args=self.hparams)
 
@@ -388,13 +408,7 @@ class FPDM(pl.LightningModule):
         t_pose = Image.open(t_pose_path).convert("RGB")#.resize((self.hparams.img_size),
                                                        #        Image.BICUBIC)
 
-        # t_pose_path = t_img_path.replace('img', 'pose').replace('.jpg', '.txt')
-        # t_keypoint = np.loadtxt(t_pose_path)
-        # t_keypoint = self.PK.trans_keypoins(t_keypoint, self.hparams.model_img_size[::-1], self.kpt_param)
-        # t_pose = self.PK.draw_img(t_keypoint, self.hparams.model_img_size[::-1], self.kpt_param)
-        s_img = s_img.resize(self.hparams.model_img_size, Image.BICUBIC)
         t_img = t_img.resize(self.hparams.model_img_size, Image.BICUBIC)
-        t_pose = t_pose.resize(self.hparams.model_img_size, Image.BICUBIC)
 
         # preprocessing
         trans_s_img = self.transform_totensor(s_img)
@@ -405,44 +419,40 @@ class FPDM(pl.LightningModule):
         else:
             trans_t_img = None
 
-        trans_t_pose = self.transform_totensor(t_pose).to(self.dtype).to(self.device).unsqueeze(0)
+        trans_t_pose = self.transform_totensor(t_pose.resize(self.hparams.model_img_size,
+                                                             Image.BICUBIC)).to(self.dtype).to(self.device).unsqueeze(0)
 
-        processed_s_img = (self.image_processor(images=s_img,
+        src_processed_s_img = (self.src_image_processor(images=s_img,
                                                 return_tensors="pt").pixel_values).to(self.dtype).to(self.device)
-        processed_t_pose = (self.image_processor(images=t_pose,
+        fusion_processed_s_img = (self.fusion_image_processor(images=s_img,
+                                                return_tensors="pt").pixel_values).to(self.dtype).to(self.device)
+        fusion_processed_t_pose = (self.fusion_image_processor(images=t_pose.resize([224, 224], Image.BICUBIC),
                                                  return_tensors="pt").pixel_values).to(self.dtype).to(self.device)
         _dict = {"source_image": trans_s_img,
                  "target_image": trans_t_img,
                  "target_pose": trans_t_pose,
-                 "processed_source_image": processed_s_img,
-                 "processed_target_pose": processed_t_pose,
+                 "src_processed_source_image": src_processed_s_img,
+                 "fusion_processed_source_image": fusion_processed_s_img,
+                 "fusion_processed_target_pose": fusion_processed_t_pose,
                  }
         return _dict
 
-    def denoising_learning(self, target_imgs, target_pose, processed_source_image, processed_target_pose):
+    def denoising_learning(self, target_imgs, target_pose,
+                           src_processed_source_image, fusion_processed_source_image, fusion_processed_target_pose):
 
         with torch.no_grad():
             # Convert images to latent space
             latents = self.vae.encode(target_imgs).latent_dist.sample()
             latents = latents * self.vae.config.scaling_factor
 
-            # from diffusers.image_processor import VaeImageProcessor
-            # self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
-            # self.image_processor = VaeImageProcessor(vae_scale_factor=self.vae_scale_factor)
-            # image = self.vae.decode(latents / self.vae.config.scaling_factor, return_dict=False)[0]  # .to(torch.float)
-            # do_denormalize = [True] * image.shape[0]
-            # images = self.image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
-            #
-
-
-            cond_src_feature = self.src_image_encoder(processed_source_image)
-            s_image_patch_embeddings = (cond_src_feature.last_hidden_state)[:, 1:, :]
+            cond_src_feature = self.src_image_encoder(src_processed_source_image)
+            s_image_patch_embeddings = (cond_src_feature.last_hidden_state[:, 1:, :])
 
             # get fusion embeddings
-            embddings_src = self.fusion_model_img_encoder(processed_source_image)
-            embddings_t_pos = self.fusion_model_pose_encoder(processed_target_pose)
+            embddings_src = self.fusion_model.img_encoder(fusion_processed_source_image)
+            embddings_t_pos = self.fusion_model.pose_encoder(fusion_processed_target_pose)
 
-            if self.hparams.src_encoder_type == 'clip':
+            if self.hparams.fusion_encoder_type == 'clip':
                 s_image_embeddings = embddings_src.image_embeds
                 t_pose_embeddings = embddings_t_pos.image_embeds
             else:
@@ -451,10 +461,10 @@ class FPDM(pl.LightningModule):
             kv_s_image_patch_embeddings = embddings_src.last_hidden_state[:, 1:, :]
             q_t_pose_patch_embeddings = embddings_t_pos.last_hidden_state[:, 1:, :]
 
-            cond_fusion_image_feature = self.fusion_model_combiner(s_image_embeddings,
+            cond_fusion_image_feature = self.fusion_model.combiner(s_image_embeddings,
                                                                    t_pose_embeddings).unsqueeze(1)
             # cond_attn_patch_embeddings = s_image_patch_embeddings # 주의
-            cond_attn_patch_embeddings = self.fusion_model_attention(q_t_pose_patch_embeddings,
+            cond_attn_patch_embeddings = self.fusion_model.attention(q_t_pose_patch_embeddings,
                                                                      kv_s_image_patch_embeddings,
                                                                      kv_s_image_patch_embeddings)
 
@@ -503,21 +513,22 @@ class FPDM(pl.LightningModule):
         return loss
 
     def denosing_pip(self, target_imgs, target_pose,
-                     processed_source_image,
-                     processed_target_pose):
+                     src_processed_source_image,
+                     fusion_processed_source_image,
+                     fusion_processed_target_pose):
 
         generator = torch.Generator().manual_seed(self.hparams.seed_number)
 
-        cond_src_feature = self.src_image_encoder(processed_source_image)
-        s_image_patch_embeddings = (cond_src_feature.last_hidden_state)[:, 1:, :]
+        cond_src_feature = self.src_image_encoder(src_processed_source_image)
+        s_image_patch_embeddings = (cond_src_feature.last_hidden_state[:, 1:, :]) #
 
         # cond_src_feature = self.src_image_encoder(processed_source_image)
         # s_image_patch_embeddings = (cond_src_feature.last_hidden_state)[:, 1:, :]
 
         # get fusion embeddings
-        embddings_src = self.fusion_model_img_encoder(processed_source_image)
-        embddings_t_pos = self.fusion_model_pose_encoder(processed_target_pose)
-        if self.hparams.src_encoder_type == 'clip':
+        embddings_src = self.fusion_model.img_encoder(fusion_processed_source_image)
+        embddings_t_pos = self.fusion_model.pose_encoder(fusion_processed_target_pose)
+        if self.hparams.fusion_encoder_type == 'clip':
             s_image_embeddings = embddings_src.image_embeds
             t_pose_embeddings = embddings_t_pos.image_embeds
         else:
@@ -526,7 +537,7 @@ class FPDM(pl.LightningModule):
 
         # image embeddings fusion
         if self.hparams.fusion_image_encoder:
-            cond_fusion_image_feature = self.fusion_model_combiner(s_image_embeddings,
+            cond_fusion_image_feature = self.fusion_model.combiner(s_image_embeddings,
                                                                    t_pose_embeddings).unsqueeze(1)
         else:
             cond_fusion_image_feature = None
@@ -538,23 +549,18 @@ class FPDM(pl.LightningModule):
             ##### pred target image patch embeddings fusion
             kv_s_image_patch_embeddings = embddings_src.last_hidden_state[:, 1:, :]
             q_t_pose_patch_embeddings = embddings_t_pos.last_hidden_state[:, 1:, :]
-            cond_attn_patch_embeddings = self.fusion_model_attention(q_t_pose_patch_embeddings,
+            cond_attn_patch_embeddings = self.fusion_model.attention(q_t_pose_patch_embeddings,
                                                                      kv_s_image_patch_embeddings,
                                                                      kv_s_image_patch_embeddings)
             cond_image_feature_f = self.sd_model.fusionpatch_proj_model(cond_attn_patch_embeddings)
-            # if self.hparams.proj_fusion_image_patch_encoder:
-            #     cond_image_feature_f = self.sd_model.fusionpatch_proj_model(cond_attn_patch_embeddings)
-            # else:
-            #     cond_image_feature_f = cond_attn_patch_embeddings
         else:
             cond_image_feature_f = None
 
         # pose image embedding
-        # t_pose_f = self.sd_model.pose_proj(target_pose)
         if self.hparams.fusion_image_patch_encoder and self.hparams.fusion_patch_embed_ahead:
             t_pose_f = cond_image_feature_f
         else:
-            t_pose_f = self.sd_model.pose_proj(target_pose)
+            t_pose_f = self.sd_model.pose_t_proj(target_pose)
 
         if self.hparams.pose_module_drop == True:
             t_pose_f = torch.zeros(t_pose_f.shape).to(self.unet.device)
@@ -575,6 +581,7 @@ class FPDM(pl.LightningModule):
             args=self.hparams
         )
 
+        # voting
         # sim_list = []
         # output_list = output[0]
         # for i in range(len(output_list)):
@@ -594,10 +601,11 @@ class FPDM(pl.LightningModule):
         # source_imgs = prep_data['source_image']
         target_imgs = prep_data['target_image']
         target_pose = prep_data['target_pose']
-        processed_source_image = prep_data['processed_source_image']
-        processed_target_pose = prep_data['processed_target_pose']
-        output = self.denosing_pip(target_imgs, target_pose,
-                                   processed_source_image, processed_target_pose)
+        src_processed_source_image = prep_data['src_processed_source_image']
+        fusion_processed_source_image = prep_data['fusion_processed_source_image']
+        fusion_processed_target_pose = prep_data['fusion_processed_target_pose']
+        output = self.denosing_pip(target_imgs, target_pose, src_processed_source_image,
+                                   fusion_processed_source_image, fusion_processed_target_pose)
 
         if mod == 'generation':
             out_dict['source_image'] = Image.open(s_img_path).convert("RGB") # .resize(self.hparams.img_size,
@@ -631,21 +639,27 @@ class FPDM(pl.LightningModule):
             out_dict['lpips'] = float(torch.mean(lpips_values.view(-1)).detach().cpu().numpy())
 
             ssim_values = []
+            ssim256_values = []
             psnr_values = []
             for gen_img in out_dict['generate_images']:
-                ssim_values.append(compare_ssim(np.array(out_dict['target_image']), np.array(gen_img),
+                ssim256_values.append(compare_ssim(np.array(out_dict['target_image']), np.array(gen_img),
                                                 gaussian_weights=True, sigma=1.5,
                                                 use_sample_covariance=False, multichannel=True, channel_axis=2,
                                                 data_range=np.array(gen_img).max() - np.array(gen_img).min()
                                                 ))
+                ssim_values.append(compare_ssim(np.array(out_dict['target_image']) / 255.0, np.array(gen_img) / 255.0, data_range=1,
+                                     win_size=51, multichannel=True, channel_axis=2))
                 psnr_values.append(
                     compare_psnr(np.array(out_dict['target_image']) / 255.0, np.array(gen_img) / 255.0, data_range=1))
             mean_ssim_value = sum(ssim_values) / self.hparams.num_images_per_prompt
+            mean_ssim256_value = sum(ssim256_values) / self.hparams.num_images_per_prompt
             mean_psnr_value = sum(psnr_values) / self.hparams.num_images_per_prompt
             out_dict['ssim'] = mean_ssim_value
+            out_dict['ssim256'] = mean_ssim256_value
             out_dict['psnr'] = mean_psnr_value
         else:
             out_dict['ssim'] = None
+            out_dict['ssim256'] = None
             out_dict['psnr'] = None
             out_dict['lpips'] = None
             out_dict['fid'] = None
@@ -661,12 +675,8 @@ class FPDM(pl.LightningModule):
         self.lpips_obj.model.to(self.device)
 
     def epoch_end_run(self, mod):
-        # self.vae.to(torch.float16)
-        # self.pipe.to(self.device)
-        # self.lpips_obj.model.to(self.device)
         self.init_device()
-
-        metric_list = ['ssim', 'psnr', 'lpips', 'fid']
+        metric_list = ['ssim', 'ssim256', 'psnr', 'lpips', 'fid']
         total_metric = {i: [] for i in metric_list}
         total_images = []
         n_samples = self.hparams.test_n_samples
@@ -698,12 +708,14 @@ class FPDM(pl.LightningModule):
         self.hparams.phase = 'train'
         target_imgs = batch['target_image']
         target_pose = batch['target_pose']
-        processed_source_image = batch['processed_source_image']
-        processed_target_pose = batch['processed_target_pose']
+        src_processed_source_image = batch['src_processed_source_image']
+        fusion_processed_source_image = batch['fusion_processed_source_image']
+        fusion_processed_target_pose = batch['fusion_processed_target_pose']
         total_loss = self.denoising_learning(target_imgs,
                                              target_pose,
-                                             processed_source_image,
-                                             processed_target_pose)
+                                             src_processed_source_image,
+                                             fusion_processed_source_image,
+                                             fusion_processed_target_pose)
 
         self.log('train_' + "loss", total_loss.mean())
         return total_loss
@@ -712,12 +724,14 @@ class FPDM(pl.LightningModule):
         self.hparams.phase = 'val'
         target_imgs = batch['target_image']
         target_pose = batch['target_pose']
-        processed_source_image = batch['processed_source_image']
-        processed_target_pose = batch['processed_target_pose']
+        src_processed_source_image = batch['src_processed_source_image']
+        fusion_processed_source_image = batch['fusion_processed_source_image']
+        fusion_processed_target_pose = batch['fusion_processed_target_pose']
         total_loss = self.denoising_learning(target_imgs,
                                              target_pose,
-                                             processed_source_image,
-                                             processed_target_pose)
+                                             src_processed_source_image,
+                                             fusion_processed_source_image,
+                                             fusion_processed_target_pose)
 
         self.log('val_' + "loss", total_loss.mean())
         return total_loss
