@@ -409,29 +409,36 @@ class FPDM_DiffusionPipeline(DiffusionPipeline):
 
         do_classifier_free_guidance = guidance_scale > 1.0
 
+
         # st pose
-        pose_cond = torch.cat([t_pose_f] * 2 * num_images_per_prompt) if do_classifier_free_guidance else t_pose_f
+        # pose_cond = torch.cat([t_pose_f] * 2 * num_images_per_prompt) if do_classifier_free_guidance else t_pose_f
         # pose_cond = pose_cond  # .to(device=device) # dtype=torch.float16,
+        pose_cond = torch.cat([t_pose_f] * num_images_per_prompt)
+        if do_classifier_free_guidance:
+            neg_pos_f = torch.zeros(pose_cond.shape).to(device)  # , dtype=torch.float16
+            pose_cond = torch.cat([neg_pos_f, pose_cond], dim=0)
 
         # source patch feature + pred. target patch feature
         if args.fusion_image_patch_encoder:
-            if not args.fusion_patch_embed_ahead:
-                if args.proj_embd_concat:
-                    feature_f = torch.cat([s_img_proj_f, pred_t_img_embed], dim=1)
-                else:
-                    feature_f = s_img_proj_f + pred_t_img_embed
-            else:
-                feature_f = s_img_proj_f
+            feature_f = torch.cat([s_img_proj_f, pred_t_img_embed], dim=1)
+            # if not args.fusion_patch_embed_ahead:
+            #     if args.proj_embd_concat:
+            #         feature_f = torch.cat([s_img_proj_f, pred_t_img_embed], dim=1)
+            #     else:
+            #         feature_f = s_img_proj_f + pred_t_img_embed
+            # else:
+            #     feature_f = s_img_proj_f
         else:
             feature_f = s_img_proj_f
         feature_f = feature_f.repeat(bs * num_images_per_prompt, 1, 1).to(device=device)  # dtype=torch.float16,
-
         # target feature
         # prior_embed = pred_t_img_embed.repeat(bs * num_images_per_prompt, 1, 1).to(device=device) #, dtype=torch.float16
         if fusion_img_embed is not None:
             prior_embed = fusion_img_embed.repeat(bs * num_images_per_prompt, 1, 1).to(device=device)  # , dtype=torch.float16
         else:
             prior_embed = None
+
+
 
         if do_classifier_free_guidance:
             # source feature + target feature
@@ -464,8 +471,6 @@ class FPDM_DiffusionPipeline(DiffusionPipeline):
             generator,
             latents,
         )  # .to(dtype=torch.float16)  # bs, 4,h/8,w/8
-        if noise_offset:
-            latents += noise_offset
 
         # 6. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
@@ -474,7 +479,10 @@ class FPDM_DiffusionPipeline(DiffusionPipeline):
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
-
+                # if args.noise_offset:
+                #     latents += args.noise_offset * torch.randn(
+                #         (latents.shape[0], latents.shape[1], 1, 1), device=latents.device
+                #     )
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = torch.cat([latents] * 2) if do_classifier_free_guidance else latents
                 # latent_model_input = torch.cat([latents] * 3) if do_classifier_free_guidance else latents

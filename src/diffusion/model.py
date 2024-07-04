@@ -11,6 +11,7 @@ from PIL import Image, ImageEnhance
 from diffusers import (
     AutoencoderKL,
     DDPMScheduler,
+    DDIMScheduler
 )
 from diffusers.models.controlnet import ControlNetConditioningEmbedding
 from skimage.metrics import peak_signal_noise_ratio as compare_psnr
@@ -29,8 +30,35 @@ from transformers import CLIPVisionModelWithProjection
 import math
 from torch.optim.lr_scheduler import LRScheduler
 import random
+from src.fusion.datautil import ProcessingKeypoints
 import matplotlib.pyplot as plt
 from typing import Any, Dict, List, Optional, Tuple, Union
+from bisect import bisect_right
+from sklearn.metrics.pairwise import cosine_similarity
+import tqdm
+from diffusers.image_processor import VaeImageProcessor
+
+class LinearWarmupMultiStepDecayLRScheduler(torch.optim.lr_scheduler._LRScheduler):
+    def __init__(self, optimizer, warmup_steps, warmup_rate, decay_rate,
+                 num_epochs, decay_epochs, iters_per_epoch, override_lr=0.,
+                 last_epoch=-1, verbose=False):
+        self.warmup_steps = warmup_steps
+        self.warmup_rate = warmup_rate
+        self.decay_rate = decay_rate
+        self.decay_epochs = [decay_epoch * iters_per_epoch for decay_epoch in decay_epochs]
+        self.num_epochs = num_epochs * iters_per_epoch
+        self.override_lr = override_lr
+        super(LinearWarmupMultiStepDecayLRScheduler, self).__init__(optimizer, last_epoch, verbose)
+
+    def get_lr(self):
+        if self.last_epoch < self.warmup_steps:
+            alpha = (self.last_epoch + 1) / self.warmup_steps
+            return [base_lr * (self.warmup_rate + (1. - self.warmup_rate) * alpha) for base_lr in self.base_lrs]
+        else:
+            if self.override_lr > 0.:
+                return [self.override_lr for _ in self.base_lrs]
+            e = bisect_right(self.decay_epochs, self.last_epoch)
+            return [base_lr * (self.decay_rate ** e) for base_lr in self.base_lrs]
 
 class WarmupStepLR(LRScheduler):
     def __init__(self, optimizer, warmup_steps, step_size, gamma=0.1, base_lr=1e-3, last_epoch=-1):
@@ -157,11 +185,6 @@ class SDModel(torch.nn.Module):
 
         self.srcimage_proj_model = SrcImage_ProjModel(in_dim=self.args.patch_proj_in_dim, hidden_dim=768, out_dim=1024,
                                                    dropout=self.args.proj_drop_rate)
-
-        # if self.args.fusion_patch_embed_ahead == True:
-        #     self.fusionpatch_proj_model = Patch_embedding_proj(in_dim=self.args.patch_proj_in_dim, hidden_dim=768, out_dim=320,
-        #                                                    dropout=self.args.proj_drop_rate, upsmaple_size=upsmaple_size)
-        # else:
 
         self.fusionpatch_proj_model = FusionPatch_ProjModel(in_dim=self.args.patch_proj_in_dim, hidden_dim=768, out_dim=1024,
                                                    dropout=self.args.proj_drop_rate)
@@ -309,11 +332,24 @@ class FPDM(pl.LightningModule):
         self.image_processor = AutoImageProcessor.from_pretrained(self.hparams.src_encoder_path)  # 앞으로 빼기
 
         self.transform_totensor = transforms.ToTensor()
+        self.transform_totensor = transforms.ToTensor()
         self.transform_normalize = transforms.Normalize([0.5], [0.5])
 
         self.fid = FID()
         self.lpips_obj = LPIPS()
         self.rec = Reconstruction_Metrics()
+
+
+        self.set_kpt_parm()
+
+    def set_kpt_parm(self):
+        if 'deepfashion' in self.hparams.data_root_path:
+            self.kpt_param = {}
+            self.kpt_param['offset'] = 40
+            self.kpt_param['stickwidth'] = 4
+            self.kpt_param['anno_width'] = 176
+            self.kpt_param['anno_height'] = 256
+        self.PK = ProcessingKeypoints()
 
     def configure_optimizers(self):
         optimizer = optim.AdamW(self.parameters(),
@@ -341,18 +377,21 @@ class FPDM(pl.LightningModule):
 
     def data_load(self, s_img_path, t_img_path, t_pose_path):
         # load images
-        s_img = Image.open(s_img_path).convert("RGB").resize((self.hparams.img_size),
-                                                             Image.BICUBIC)
+        s_img = Image.open(s_img_path).convert("RGB")#.resize((self.hparams.img_size),
+                                                     #        Image.BICUBIC)
         if t_img_path:
-            t_img = Image.open(t_img_path).convert("RGB").resize((self.hparams.img_size),
-                                                                 Image.BICUBIC)
+            t_img = Image.open(t_img_path).convert("RGB")#.resize((self.hparams.img_size),
+                                                         #        Image.BICUBIC)
         else:
             t_img = None
 
-        t_pose = Image.open(t_pose_path).convert("RGB").resize((self.hparams.img_size),
-                                                               Image.BICUBIC)
+        t_pose = Image.open(t_pose_path).convert("RGB")#.resize((self.hparams.img_size),
+                                                       #        Image.BICUBIC)
 
-
+        # t_pose_path = t_img_path.replace('img', 'pose').replace('.jpg', '.txt')
+        # t_keypoint = np.loadtxt(t_pose_path)
+        # t_keypoint = self.PK.trans_keypoins(t_keypoint, self.hparams.model_img_size[::-1], self.kpt_param)
+        # t_pose = self.PK.draw_img(t_keypoint, self.hparams.model_img_size[::-1], self.kpt_param)
         s_img = s_img.resize(self.hparams.model_img_size, Image.BICUBIC)
         t_img = t_img.resize(self.hparams.model_img_size, Image.BICUBIC)
         t_pose = t_pose.resize(self.hparams.model_img_size, Image.BICUBIC)
@@ -368,9 +407,9 @@ class FPDM(pl.LightningModule):
 
         trans_t_pose = self.transform_totensor(t_pose).to(self.dtype).to(self.device).unsqueeze(0)
 
-        processed_s_img = (self.image_processor(images=s_img.resize((224, 224)),
+        processed_s_img = (self.image_processor(images=s_img,
                                                 return_tensors="pt").pixel_values).to(self.dtype).to(self.device)
-        processed_t_pose = (self.image_processor(images=t_pose.resize((224, 224)),
+        processed_t_pose = (self.image_processor(images=t_pose,
                                                  return_tensors="pt").pixel_values).to(self.dtype).to(self.device)
         _dict = {"source_image": trans_s_img,
                  "target_image": trans_t_img,
@@ -386,6 +425,15 @@ class FPDM(pl.LightningModule):
             # Convert images to latent space
             latents = self.vae.encode(target_imgs).latent_dist.sample()
             latents = latents * self.vae.config.scaling_factor
+
+            # from diffusers.image_processor import VaeImageProcessor
+            # self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
+            # self.image_processor = VaeImageProcessor(vae_scale_factor=self.vae_scale_factor)
+            # image = self.vae.decode(latents / self.vae.config.scaling_factor, return_dict=False)[0]  # .to(torch.float)
+            # do_denormalize = [True] * image.shape[0]
+            # images = self.image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
+            #
+
 
             cond_src_feature = self.src_image_encoder(processed_source_image)
             s_image_patch_embeddings = (cond_src_feature.last_hidden_state)[:, 1:, :]
@@ -520,12 +568,24 @@ class FPDM(pl.LightningModule):
             t_pose_f=t_pose_f,
             fusion_img_embed=cond_fusion_image_feature,
             pred_t_img_embed=cond_image_feature_f,
-            num_images_per_prompt=self.hparams.num_images_per_prompt,
+            num_images_per_prompt= self.hparams.num_images_per_prompt,
             guidance_scale=self.hparams.guidance_scale,
             generator=generator,
             num_inference_steps=self.hparams.num_inference_steps,
             args=self.hparams
         )
+
+        # sim_list = []
+        # output_list = output[0]
+        # for i in range(len(output_list)):
+        #     processed_pred_img = (self.image_processor(images=output_list[i],
+        #                                             return_tensors="pt").pixel_values).to(self.dtype).to(self.device)
+        #     embddings_pred = self.fusion_model_img_encoder(processed_pred_img).image_embeds
+        #     _sim = cosine_similarity(cond_fusion_image_feature.squeeze(0).cpu().numpy(), embddings_pred.cpu().numpy()).squeeze()
+        #     sim_list.append(_sim.tolist())
+        # _arg_idx = np.argmax(sim_list)
+        # output.images = [output.images[_arg_idx]]
+
         return output
 
     def one_image_generation(self, s_img_path, t_img_path, t_pose_path, mod):
@@ -540,11 +600,11 @@ class FPDM(pl.LightningModule):
                                    processed_source_image, processed_target_pose)
 
         if mod == 'generation':
-            out_dict['source_image'] = Image.open(s_img_path).convert("RGB").resize(self.hparams.img_size,
-                                                                                    Image.BICUBIC)
-            out_dict['target_pose'] = Image.open(t_pose_path).convert("RGB").resize(self.hparams.img_size,
-                                                                                    Image.BICUBIC)
-            out_dict['generate_images'] = [i.resize(self.hparams.img_size, Image.BICUBIC) for i in output.images]
+            out_dict['source_image'] = Image.open(s_img_path).convert("RGB") # .resize(self.hparams.img_size,
+                                                                             #       Image.BICUBIC)
+            out_dict['target_pose'] = Image.open(t_pose_path).convert("RGB") # .resize(self.hparams.img_size,
+                                                                             #       Image.BICUBIC)
+            out_dict['generate_images'] = [i for i in output.images] #.resize(self.hparams.img_size, Image.BICUBIC)
             return out_dict
 
         out_dict['source_image'] = Image.open(s_img_path).convert("RGB").resize(self.hparams.img_size,
@@ -553,7 +613,7 @@ class FPDM(pl.LightningModule):
                                                                                 Image.BICUBIC)
         out_dict['target_pose'] = Image.open(t_pose_path).convert("RGB").resize(self.hparams.img_size,
                                                                                 Image.BICUBIC)
-        out_dict['generate_images'] = [i.resize(self.hparams.img_size, Image.BICUBIC) for i in output.images]
+        out_dict['generate_images'] = [i.resize(self.hparams.img_size, Image.BICUBIC) for i in output.images] #
 
         if self.hparams.calculate_metrics:
             trans_target = np.expand_dims(np.array(out_dict['target_image']).transpose(2, 0, 1), 0) / 255.
@@ -574,7 +634,7 @@ class FPDM(pl.LightningModule):
             psnr_values = []
             for gen_img in out_dict['generate_images']:
                 ssim_values.append(compare_ssim(np.array(out_dict['target_image']), np.array(gen_img),
-                                                gaussian_weights=True, sigma=1.2,
+                                                gaussian_weights=True, sigma=1.5,
                                                 use_sample_covariance=False, multichannel=True, channel_axis=2,
                                                 data_range=np.array(gen_img).max() - np.array(gen_img).min()
                                                 ))
@@ -665,6 +725,133 @@ class FPDM(pl.LightningModule):
     def on_train_epoch_end(self):
         self.hparams.phase = 'train'
         self.epoch_end_run(self.hparams.phase)
+
+    def on_validation_epoch_end(self):
+        self.hparams.phase = 'val'
+        self.epoch_end_run(self.hparams.phase)
+
+
+class VAETEST(pl.LightningModule):
+    def __init__(self, args):
+        super().__init__()
+
+        self.args = args
+        self.save_hyperparameters(args)
+        # load train and test dataset list
+        if os.path.exists(self.hparams.train_json_path):
+            self.train_data_list = json.load(open(self.hparams.train_json_path))
+        else:
+            self.train_data_list = None
+        if os.path.exists(self.hparams.test_json_path):
+            self.test_data_list = json.load(open(self.hparams.test_json_path))
+        else:
+            self.test_data_list = None
+
+        self.save_hyperparameters(self.args)
+
+        # Load model
+        self.vae = AutoencoderKL.from_pretrained(self.hparams.pretrained_model_name_or_path, subfolder="vae")
+        self.vae.requires_grad_(False)
+        self.image_processor = AutoImageProcessor.from_pretrained(self.hparams.src_encoder_path)  # 앞으로 빼기
+
+        self.transform_totensor = transforms.ToTensor()
+        self.transform_totensor = transforms.ToTensor()
+        self.transform_normalize = transforms.Normalize([0.5], [0.5])
+
+        self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
+        self.vae_image_processor = VaeImageProcessor(vae_scale_factor=self.vae_scale_factor)
+
+    def configure_optimizers(self):
+        optimizer = optim.AdamW(self.parameters(),
+                                lr=self.hparams.lr,
+                                weight_decay=self.hparams.weight_decay)
+
+        lr_scheduler = WarmupStepLR(optimizer = optimizer,
+                                    warmup_steps = self.hparams.scheduler_t_up,
+                                    step_size = self.hparams.scheduler_step_size,
+                                    gamma = self.hparams.scheduler_gamma,
+                                    base_lr=self.hparams.scheduler_eta_max)
+
+        return [optimizer], [lr_scheduler]
+
+    def data_load(self, s_img_path, t_img_path, t_pose_path):
+        # load images
+        s_img = Image.open(s_img_path).convert("RGB")#.resize((self.hparams.img_size),
+                                                     #        Image.BICUBIC)
+        if t_img_path:
+            t_img = Image.open(t_img_path).convert("RGB")#.resize((self.hparams.img_size),
+                                                         #        Image.BICUBIC)
+        else:
+            t_img = None
+
+        t_pose = Image.open(t_pose_path).convert("RGB")#.resize((self.hparams.img_size),
+                                                       #        Image.BICUBIC)
+
+        s_img = s_img.resize(self.hparams.model_img_size, Image.BICUBIC)
+        t_img = t_img.resize(self.hparams.model_img_size, Image.BICUBIC)
+        t_pose = t_pose.resize(self.hparams.model_img_size, Image.BICUBIC)
+
+        # preprocessing
+        trans_s_img = self.transform_totensor(s_img)
+        trans_s_img = self.transform_normalize(trans_s_img).to(self.dtype).to(self.device).unsqueeze(0)
+        if t_img_path:
+            trans_t_img = self.transform_totensor(t_img)
+            trans_t_img = self.transform_normalize(trans_t_img).to(self.dtype).to(self.device).unsqueeze(0)
+        else:
+            trans_t_img = None
+
+        trans_t_pose = self.transform_totensor(t_pose).to(self.dtype).to(self.device).unsqueeze(0)
+
+        processed_s_img = (self.image_processor(images=s_img,
+                                                return_tensors="pt").pixel_values).to(self.dtype).to(self.device)
+        processed_t_pose = (self.image_processor(images=t_pose,
+                                                 return_tensors="pt").pixel_values).to(self.dtype).to(self.device)
+        _dict = {"source_image": trans_s_img,
+                 "target_image": trans_t_img,
+                 "target_pose": trans_t_pose,
+                 "processed_source_image": processed_s_img,
+                 "processed_target_pose": processed_t_pose,
+                 }
+        return _dict
+
+    def epoch_end_run(self, mod):
+        for i in tqdm.tqdm(range(len(self.test_data_list))):
+            _dat = self.test_data_list[i]
+            s_img_path = os.path.join(self.hparams.data_root_path, _dat['source_image'])  # png
+            t_img_path = os.path.join(self.hparams.data_root_path, _dat['target_image'])  # png
+            t_pose_path = os.path.join(self.hparams.data_root_path,
+                                       _dat['target_image'].replace('img', 'pose_img'))  # png
+
+            prep_data = self.data_load(s_img_path, t_img_path, t_pose_path)
+            target_imgs = prep_data['target_image']
+            # target_pose = prep_data['target_pose']
+            # processed_source_image = prep_data['processed_source_image']
+            # processed_target_pose = prep_data['processed_target_pose']
+
+            with torch.no_grad():
+                # Convert images to latent space
+                latents = self.vae.encode(target_imgs).latent_dist.sample()
+                latents = latents * self.vae.config.scaling_factor
+                self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
+                image = self.vae.decode(latents / self.vae.config.scaling_factor, return_dict=False)[0]  # .to(torch.float)
+                do_denormalize = [True] * image.shape[0]
+                images = self.vae_image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
+
+            g_img_path = t_img_path.replace('img', 'vae_img')
+            dirname = os.path.dirname(g_img_path)
+            if not os.path.exists(dirname):
+                os.makedirs(dirname, exist_ok=True)
+            images[0].save(g_img_path, format='PNG')
+
+
+    def training_step(self, batch):
+        pass
+
+    def validation_step(self, batch):
+        pass
+
+    def on_train_epoch_end(self):
+        pass
 
     def on_validation_epoch_end(self):
         self.hparams.phase = 'val'

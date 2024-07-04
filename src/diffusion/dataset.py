@@ -101,8 +101,7 @@ class FPDM_Dataset(Dataset):
     def transforms(self, source_img, target_img, t_keypoint):
         # Random crop
         # t_keypoint
-        if random.random() < 0.9:
-            np.array(self.model_img_size) * 0.01
+        if random.random() < 1.0:
             kpt_shape = t_keypoint.shape
             random_noise = np.random.normal(0, 1, kpt_shape[0]*kpt_shape[1]).reshape(kpt_shape)
             t_keypoint = t_keypoint + random_noise
@@ -114,7 +113,36 @@ class FPDM_Dataset(Dataset):
             t_keypoint[:, 0] = self.model_img_size[0] - t_keypoint[:, 0]
             t_keypoint[pt_mask] = -1
 
-        return source_img, target_img, t_keypoint
+        # if random.random() < 0.0:  # 0.5
+        #     crop = transforms.RandomResizedCrop(self.model_img_size)
+        #     params = crop.get_params(source_img, scale=(0.8, 1), ratio=(1.0, 1.0))
+        #     source_img = transforms.functional.crop(source_img, *params)
+        #     source_img = transforms.functional.resize(source_img, crop.size[::-1])
+        #
+        #
+        # if random.random() < 0.0:  # 0.5
+        #     crop = transforms.RandomResizedCrop(self.model_img_size)
+        #     params = crop.get_params(source_img, scale=(0.8, 1), ratio=(1.0, 1.0))
+        #     target_img = transforms.functional.crop(target_img, *params)
+        #     target_img = transforms.functional.resize(target_img, crop.size[::-1])
+        #     kpt_mask = t_keypoint == -1
+        #     t_keypoint = self.kpt_cropresize(t_keypoint, params)
+        #     t_keypoint[kpt_mask] = -1
+        #     t_pose = self.PK.draw_img(t_keypoint, self.model_img_size[::-1], self.kpt_param)
+        # else:
+        #     t_pose = self.PK.draw_img(t_keypoint, self.model_img_size[::-1], self.kpt_param)
+
+        t_pose = self.PK.draw_img(t_keypoint, self.model_img_size[::-1], self.kpt_param)
+
+        # if random.random() < 1.0:  # 0.8
+        #     jitter = transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1)
+        #     params = jitter.get_params(jitter.brightness, jitter.contrast, jitter.saturation, jitter.hue)
+        #
+        #     for i in np.array(params[0]):
+        #         source_img = self.ColorJitter_functions[i](source_img, params[i + 1])
+        #         target_img = self.ColorJitter_functions[i](target_img, params[i + 1])
+
+        return source_img, target_img, t_pose
 
     def __getitem__(self, idx):
         item = self.data[idx]
@@ -135,8 +163,9 @@ class FPDM_Dataset(Dataset):
         t_keypoint = np.loadtxt(t_pose_path)
         t_keypoint = self.PK.trans_keypoins(t_keypoint, self.model_img_size[::-1], self.kpt_param)
         if self.phase == 'train':
-            s_img, t_img, t_keypoint = self.transforms(s_img, t_img, t_keypoint)
-        t_pose = self.PK.draw_img(t_keypoint, self.model_img_size[::-1], self.kpt_param)
+            s_img, t_img, t_pose = self.transforms(s_img, t_img, t_keypoint)
+        else:
+            t_pose = self.PK.draw_img(t_keypoint, self.model_img_size[::-1], self.kpt_param)
 
         processed_s_img = (self.image_processor(images=s_img, return_tensors="pt").pixel_values).squeeze(dim=0)
         processed_t_pose = (self.image_processor(images=t_pose, return_tensors="pt").pixel_values).squeeze(dim=0)

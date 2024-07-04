@@ -169,38 +169,36 @@ def omit_image_only(_dataset, type):
 def resize_image(image_list, resized_dirname, ratio):
     for i in tqdm.tqdm(range(len(image_list))):
         c_path = image_list[i]
-        s_path = c_path.replace('img', resized_dirname)
+        s_path = c_path.replace('original_img', resized_dirname)
         if os.path.exists(s_path):
             continue
         img = cv2.imread(c_path)
         h, w, c = img.shape
-        img = cv2.resize(img, (int(w*ratio), int(h*ratio)))
-        img = cv2.resize(img, (int(512), int(512)))
+        # img = cv2.resize(img, (int(w*ratio), int(h*ratio)))
+        img = cv2.resize(img, (int(768), int(768)))
         dir_path = os.path.split(s_path)[0]
         if not os.path.exists(dir_path):
             os.makedirs(dir_path, exist_ok=True)
         cv2.imwrite(s_path, img, [cv2.IMWRITE_JPEG_QUALITY, 100])
-        if i % 100 == 0:
-            print(i)
     print('finishing the image resize process')
 
 
 def run_preprcessing_deepfashion(resized_dirname, dataset_dir):
     print('image resize preprocessing')
-    image_list = glob.glob(os.path.join(dataset_dir, 'img/**/*.jpg'), recursive=True)
+    image_list = glob.glob(os.path.join(dataset_dir, 'original_img/**/*.jpg'), recursive=True)
     resize_image(image_list, resized_dirname, ratio=0.5)
 
-    print('annotation preprocessing')
-    train_dataset, test_dataset = reformat_deepfashion_dataset(dataset_dir, image_list)
-    # check if imgs has no pose annotation omit.
-    train_dataset = omit_image_only(train_dataset, 'train')
-    test_dataset = omit_image_only(test_dataset, 'test')
-
-    with open(os.path.join(dataset_dir, f'train_pairs_data.json'), 'w') as f:
-        json.dump(train_dataset, f)
-    with open(os.path.join(dataset_dir, f'test_pairs_data.json'), 'w') as f:
-        json.dump(test_dataset, f)
-    print('process finished !! ')
+    # print('annotation preprocessing')
+    # train_dataset, test_dataset = reformat_deepfashion_dataset(dataset_dir, image_list)
+    # # check if imgs has no pose annotation omit.
+    # train_dataset = omit_image_only(train_dataset, 'train')
+    # test_dataset = omit_image_only(test_dataset, 'test')
+    #
+    # with open(os.path.join(dataset_dir, f'train_pairs_data.json'), 'w') as f:
+    #     json.dump(train_dataset, f)
+    # with open(os.path.join(dataset_dir, f'test_pairs_data.json'), 'w') as f:
+    #     json.dump(test_dataset, f)
+    # print('process finished !! ')
 
 def run_preprcessing_market1501(dataset_dir):
     image_list = glob.glob(os.path.join(dataset_dir, 'Market-1501-v15.09.15/**/*.jpg'), recursive=True)
@@ -232,7 +230,7 @@ def run_preprcessing_sign(dataset_dir):
 root_dir = './dataset'
 dataset = 'deepfashion'# 'sign' #'market1501' # sign one_video_test
 dataset_type = 'video_test' #'video_test
-resized_dirname = 'resized512_img'
+resized_dirname = 'resized768_img'
 dataset_dir = os.path.join(root_dir, dataset)
 
 if dataset == 'deepfashion':

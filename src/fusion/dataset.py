@@ -14,7 +14,12 @@ class FusionDataset(Dataset):
         self.data = data
         self.args = args
         self.image_processor = AutoImageProcessor.from_pretrained(self.args.img_encoder_path)  # 앞으로 빼기
-        self.image_processor.size['shortest_edge'] = 224
+        if 'clip' in self.args.img_encoder_path:
+            self.image_processor.size['shortest_edge'] = 224
+        elif 'dino' in self.args.img_encoder_path:
+            self.image_processor.size['shortest_edge'] = 224
+        else:
+            pass
         self.ColorJitter_functions = {0: transforms.functional.adjust_brightness,
                                       1: transforms.functional.adjust_contrast,
                                       2: transforms.functional.adjust_saturation,
@@ -24,40 +29,7 @@ class FusionDataset(Dataset):
         return len(self.data)
 
     def transforms(self, source_img, target_img, pos_t_img):
-        # Random crop
-        # if random.random() < 0.0:
-        #     crop = transforms.RandomResizedCrop(self.args.img_size)
-        #     params = crop.get_params(source_img, scale=(0.5, 1.0), ratio=(0.75, 1.33))
-        #     source_img = transforms.functional.crop(source_img, *params)
-        #     source_img = transforms.functional.resize(source_img, crop.size[::-1])
-        #
-        #     # params = crop.get_params(source_img, scale=(0.8, 1.1), ratio=(0.75, 1.33))
-        #     target_img = transforms.functional.crop(target_img, *params)
-        #     target_img = transforms.functional.resize(target_img, crop.size[::-1])
-        #
-        #     pos_t_img = transforms.functional.crop(pos_t_img, *params)
-        #     pos_t_img = transforms.functional.resize(pos_t_img, crop.size[::-1])
-        #
-        # # Random horizontal flipping
-        # if random.random() < 0.0:
-        #     source_img = transforms.functional.hflip(source_img)
-        # if random.random() < 0.0:
-        #     target_img = transforms.functional.hflip(target_img)
-        #     pos_t_img = transforms.functional.hflip(
-        #         pos_t_img)  # plt.imshow(pos_t_img.numpy().transpose(1,2,0)); plt.show()
-        #
-        # if random.random() < 0.0:  # 0.8
-        #     jitter = transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.1)
-        #     params = jitter.get_params(jitter.brightness, jitter.contrast, jitter.saturation, jitter.hue)
-        #
-        #     for i in np.array(params[0]):
-        #         source_img = self.ColorJitter_functions[i](source_img, params[i + 1])
-        #         target_img = self.ColorJitter_functions[i](target_img, params[i + 1])
-        #
-        # if random.random() < 0.0:  # 0.2
-        #     target_img = transforms.functional.rgb_to_grayscale(target_img, num_output_channels=3)
-        #     source_img = transforms.functional.rgb_to_grayscale(source_img, num_output_channels=3)
-
+        pass
         return source_img, target_img, pos_t_img
 
     def __getitem__(self, idx):
@@ -69,14 +41,13 @@ class FusionDataset(Dataset):
         target_img_path = os.path.join(self.args.root_path, target_img_filename)
 
         source_img = Image.open(source_img_path)
-        # source_img = source_img.resize(self.args.img_size)
-
         target_img = Image.open(target_img_path)
-        # target_img = target_img.resize(self.args.img_size)
-
+        # aa = source_img.resize([224,224], Image.BICUBIC)
+        #i=40; j=50; k=16
+        #plt.imshow(np.array(aa)[i:i + k, j:j + k, :]);
+        # plt.show()
         pose_path = target_img_path.replace('img', 'pose_img')
         pos_t_img = Image.open(pose_path)
-        # pos_t_img = pos_t_img.resize(self.args.img_size)
 
 
         if self.args.phase == 'train':

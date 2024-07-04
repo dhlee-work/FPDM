@@ -187,7 +187,7 @@ class FID():
            activations of the given tensor when feeding inception with the
            query tensor.
         """
-        self.inception_blocks .eval()
+        self.inception_blocks.eval()
 
         d0 = images.shape[0]
         if self.batch_size > d0:
@@ -370,7 +370,7 @@ class Reconstruction_Metrics():
             img_gt_256 = img_gt * 255.0
             img_pred_256 = img_pred * 255.0
             ssim_256.append(compare_ssim(img_gt_256, img_pred_256, gaussian_weights=True, sigma=1.5,
-                                         use_sample_covariance=False, channel_axis=2, # multichannel=True,
+                                         use_sample_covariance=False, channel_axis=2, multichannel=True,
                                          data_range=img_pred_256.max() - img_pred_256.min()))
             if np.mod(index, 200) == 0:
                 print(
@@ -389,6 +389,7 @@ class Reconstruction_Metrics():
         print(
             "PSNR: %.4f" % round(np.mean(psnr), 4),
             "PSNR Variance: %.4f" % round(np.var(psnr), 4),
+            "SSIM: %.4f" % round(np.mean(ssim), 4),
             "SSIM_256: %.4f" % round(np.mean(ssim_256), 4),
             "SSIM_256 Variance: %.4f" % round(np.var(ssim_256), 4),
             "MAE: %.4f" % round(np.mean(mae), 4),
@@ -399,6 +400,7 @@ class Reconstruction_Metrics():
 
         dic = {"psnr": [round(np.mean(psnr), 6)],
                "psnr_variance": [round(np.var(psnr), 6)],
+               "ssim" :[round(np.mean(ssim), 6)],
                "ssim_256": [round(np.mean(ssim_256), 6)],
                "ssim_256_variance": [round(np.var(ssim_256), 6)],
                "mae": [round(np.mean(mae), 6)],
@@ -474,7 +476,7 @@ class LPIPS():
         result = self.model.forward(image_1, image_2)
         return result
 
-    def calculate_from_disk(self, path_1, path_2, img_size, batch_size=4, verbose=False, sort=True):
+    def calculate_from_disk(self, path_1, path_2, img_size, batch_size=16, verbose=False, sort=True):
 
         if sort:
             files_1 = sorted(get_image_list(path_1))
@@ -501,10 +503,10 @@ class LPIPS():
             end = start + batch_size
 
             imgs_1 = np.array(
-                [np.array(Image.open(fn).convert("RGB").resize(img_size, Image.BICUBIC))/255. for fn
+                [np.array(Image.open(fn).resize(img_size, Image.BICUBIC))/255. for fn # .convert("RGB")
                  in files_1[start:end]])
             imgs_2 = np.array(
-                [np.array(Image.open(fn).convert("RGB").resize([176, 256], Image.BICUBIC).resize(img_size, Image.BICUBIC))/255. for fn #
+                [np.array(Image.open(fn).resize(img_size, Image.BICUBIC))/255. for fn # .convert("RGB")
                  in files_2[start:end]])
 
             imgs_1 = imgs_1.transpose((0, 3, 1, 2))
