@@ -28,9 +28,9 @@ class FusionDataset(Dataset):
     def __len__(self):
         return len(self.data)
 
-    def transforms(self, source_img, target_img, pos_t_img):
-        pass
-        return source_img, target_img, pos_t_img
+    # def transforms(self, source_img, target_img, pos_t_img):
+    #     pass
+    #     return source_img, target_img, pos_t_img
 
     def __getitem__(self, idx):
         dat = self.data[idx]
@@ -42,21 +42,18 @@ class FusionDataset(Dataset):
 
         source_img = Image.open(source_img_path)
         target_img = Image.open(target_img_path)
-        # aa = source_img.resize([224,224], Image.BICUBIC)
-        #i=40; j=50; k=16
-        #plt.imshow(np.array(aa)[i:i + k, j:j + k, :]);
-        # plt.show()
+
         pose_path = target_img_path.replace('img', 'pose_img')
         pos_t_img = Image.open(pose_path)
 
-
-        if self.args.phase == 'train':
-            source_img, target_img, pos_t_img = self.transforms(source_img, target_img, pos_t_img)
+        # if self.args.phase == 'train':
+        #     source_img, target_img, pos_t_img = self.transforms(source_img, target_img, pos_t_img)
 
         processed_source_img = (self.image_processor(images=source_img,
                                                      return_tensors="pt").pixel_values).squeeze(dim=0)
         processed_target_img = (self.image_processor(images=target_img,
                                                      return_tensors="pt").pixel_values).squeeze(dim=0)
+        pos_t_img = pos_t_img.resize([224, 224], Image.BICUBIC)
         processed_target_pose = (self.image_processor(images=pos_t_img,
                                                       return_tensors="pt").pixel_values).squeeze(dim=0)
 
