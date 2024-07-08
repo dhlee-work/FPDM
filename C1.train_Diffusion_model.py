@@ -27,24 +27,30 @@ def str2bool(v):
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default='./config/c1.fpdm-clip-deepfashion-test.yaml', help='Path to config file')
+    parser.add_argument("--config", type=str, default='./config/c1.fpdm-clip-deepfashion-05.yaml', help='Path to config file')
     return parser.parse_args()
 
 
 def load_logger(config):
-    # project_name = os.path.basename(args.config).split('.')[0]
     time_now = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
     log_dir = f"logs/{config.project_name}/{time_now}/"
     os.makedirs(log_dir, exist_ok=True)
     if not config.disable_logger:
-        logger = WandbLogger(name=config.project_name,
-                             project=config.project_name,
-                             log_model=True,
-                             save_dir=log_dir,
-                             # id='hs01jgud',  #'hs01jgud',
-                             # resume="allow",
-                             # reinit=True
-                             )
+        if config.logger_id:
+            logger = WandbLogger(name=config.project_name,
+                                 project=config.project_name,
+                                 log_model=True,
+                                 save_dir=log_dir,
+                                 id=config.logger_id,
+                                 resume="allow",
+                                 reinit=True
+                                 )
+        else:
+            logger = WandbLogger(name=config.project_name,
+                                 project=config.project_name,
+                                 log_model=True,
+                                 save_dir=log_dir,
+                                 )
     else:
         logger = None
 

@@ -92,43 +92,69 @@ class FPDM_Dataset(Dataset):
     def transforms(self, source_img, target_img, s_keypoint, t_keypoint):
         # Random crop
         # t_keypoint
+        t_keypoint2 = t_keypoint.copy()
+        pose_size = [375, 550]
+        s_pose = self.PK.draw_img(s_keypoint, [pose_size[1], pose_size[0]], self.kpt_param)
         if random.random() < 1.0:
             kpt_shape = t_keypoint.shape
             random_noise = np.random.normal(0, 1, kpt_shape[0]*kpt_shape[1]).reshape(kpt_shape)
+
+            pt_mask = t_keypoint == -1
             t_keypoint = t_keypoint + random_noise
+            t_keypoint[pt_mask] = -1
+
+            t_keypoint[t_keypoint < 0] = -1
+            t_keypoint[:, 0][t_keypoint[:, 0] > pose_size[0]] = pose_size[0] - 1
+            t_keypoint[:, 1][t_keypoint[:, 1] > pose_size[1]] = pose_size[1] - 1
+
 
         if random.random() < 1.0:
             kpt_shape = s_keypoint.shape
             random_noise = np.random.normal(0, 1, kpt_shape[0]*kpt_shape[1]).reshape(kpt_shape)
             s_keypoint = s_keypoint + random_noise
 
+            s_keypoint[s_keypoint < 0] = -1
+            s_keypoint[:, 0][s_keypoint[:, 0] > pose_size[0]] = pose_size[0] - 1
+            s_keypoint[:, 1][s_keypoint[:, 1] > pose_size[1]] = pose_size[1] - 1
+
+
         if random.random() < 0.5:
             source_img = transforms.functional.hflip(source_img)
             target_img = transforms.functional.hflip(target_img)
+
             pt_mask = t_keypoint == -1
-            t_keypoint[:, 0] = self.model_img_size[0] - t_keypoint[:, 0]
+            t_keypoint[:, 0] = pose_size[0] - t_keypoint[:, 0]
             t_keypoint[pt_mask] = -1
+            t_keypoint = self.flip_kpt_position(t_keypoint)
 
             pt_mask = s_keypoint == -1
-            s_keypoint[:, 0] = self.model_img_size[0] - s_keypoint[:, 0]
+            s_keypoint[:, 0] = pose_size[0] - s_keypoint[:, 0]
             s_keypoint[pt_mask] = -1
+            s_keypoint = self.flip_kpt_position(s_keypoint)
 
-        t_pose = self.PK.draw_img(t_keypoint, self.model_img_size[::-1], self.kpt_param)
-        s_pose = self.PK.draw_img(s_keypoint, self.model_img_size[::-1], self.kpt_param)
+        t_pose = self.PK.draw_img(t_keypoint, [pose_size[1], pose_size[0]], self.kpt_param)
+        s_pose = self.PK.draw_img(s_keypoint, [pose_size[1], pose_size[0]], self.kpt_param)
         return source_img, target_img, s_pose, t_pose
 
     def __getitem__(self, idx):
         item = self.data[idx]
 
         s_img_path = os.path.join(self.image_root_path, item["source_image"])
-        s_img = Image.open(s_img_path)# .resize(self.img_size, Image.BICUBIC)
-
         t_img_path = os.path.join(self.image_root_path, item["target_image"])
+
+        if self.phase == 'train':
+            if random.random() < 0.05:
+                if random.random() < 0.5:
+                    t_img_path = s_img_path
+                else:
+                    s_img_path = t_img_path
+
+        s_img = Image.open(s_img_path)# .resize(self.img_size, Image.BICUBIC)
         t_img = Image.open(t_img_path)# .resize(self.img_size, Image.BICUBIC)
         t_img = t_img.resize(self.model_img_size, Image.BICUBIC)
 
 
-        # t_pose = Image.open(t_img_path.replace("/img/", "/pose_img/")).resize(self.img_size, Image.BICUBIC)
+        # t_pose = Image.open(t_img_path.replace("/img/", "/pose_img/"))#.resize(self.img_size, Image.BICUBIC)
         # t_pose = t_pose.resize(self.model_img_size, Image.BICUBIC)
 
         t_pose_path = t_img_path.replace('img', 'pose').replace('.jpg', '.txt')
@@ -138,6 +164,7 @@ class FPDM_Dataset(Dataset):
         s_pose_path = s_img_path.replace('img', 'pose').replace('.jpg', '.txt')
         s_keypoint = np.loadtxt(s_pose_path)
         s_keypoint = self.PK.trans_keypoins(s_keypoint, [550, 375], self.kpt_param)
+        # s_img, t_img, s_pose, t_pose = self.transforms(s_img, t_img, s_keypoint, t_keypoint)
         if self.phase == 'train':
             s_img, t_img, s_pose, t_pose = self.transforms(s_img, t_img, s_keypoint, t_keypoint)
         else:
@@ -193,3 +220,15 @@ class FPDM_Dataset(Dataset):
         t_pose[:, t_kpt_pad[1][1]:, :] = 255
         t_pose = Image.fromarray(t_pose)
         return t_pose
+
+    def flip_kpt_position(self, keypoints):
+        new_keypoints = np.zeros_like(keypoints)
+
+        key_flip_mapping = [[0, 0], [1, 1], [2, 5], [3, 6],
+                            [4, 7], [5, 2], [6, 3], [7, 4], [8, 11],
+                            [9, 12], [10, 13], [11, 8], [12, 9], [13, 10],
+                            [14, 15], [15, 14], [16, 17], [17, 16]]
+        for i, j in key_flip_mapping:
+            new_keypoints[i] = keypoints[j]
+
+        return new_keypoints

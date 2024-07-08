@@ -212,9 +212,22 @@ class SDModel(torch.nn.Module):
                 cond_src_image_feature, cond_img_patch_feature,
                 cond_attn_patch_feature, pose_s, pose_t, phase):
 
+        pose_t_cond = self.pose_t_proj(pose_t)
+        if random.random() < self.args.pose_drop_rate:
+            pose_t_cond = torch.zeros(pose_t_cond.shape, device=pose_t_cond.device)
+
         if self.args.fusion_image_patch_encoder == True:
             extra_patch_embeddings_s = self.srcimage_proj_model(cond_img_patch_feature)
             extra_patch_embeddings_f = self.fusionpatch_proj_model(cond_attn_patch_feature)
+
+            if self.args.src_kpt_encoder:
+                pose_s_cond = self.pose_s_proj(pose_s)
+                if random.random() < self.args.pose_drop_rate:
+                    pose_s_cond = torch.zeros(pose_s_cond.shape, device=pose_s_cond.device)
+                pose_s_cond = torch.flatten(pose_s_cond, 2, 3).transpose(1, 2)
+                extra_patch_embeddings_s[:, 1:, :] += pose_s_cond
+            else:
+                pass
 
             if self.args.proj_embd_concat == True:
                 encoder_image_hidden_states = torch.cat((extra_patch_embeddings_s, extra_patch_embeddings_f), axis =1)
@@ -224,6 +237,15 @@ class SDModel(torch.nn.Module):
                 encoder_image_hidden_states = extra_patch_embeddings_s + extra_patch_embeddings_f
         else:
             extra_patch_embeddings_s = self.srcimage_proj_model(cond_img_patch_feature)
+            if self.args.src_kpt_encoder:
+                pose_s_cond = self.pose_s_proj(pose_s)
+                if random.random() < self.args.pose_drop_rate:
+                    pose_s_cond = torch.zeros(pose_s_cond.shape, device=pose_s_cond.device)
+                pose_s_cond = torch.flatten(pose_s_cond, 2, 3).transpose(1, 2)
+                extra_patch_embeddings_s[:, 1:, :] += pose_s_cond
+            else:
+                pass
+
             if phase == 'train':
                 if random.random() < self.args.module_drop_rate:
                     extra_patch_embeddings_s = torch.zeros(extra_patch_embeddings_s.shape).to(self.unet.device)
@@ -236,17 +258,6 @@ class SDModel(torch.nn.Module):
                     cond_src_image_feature = torch.zeros(cond_src_image_feature.shape).to(self.unet.device)
         else:
             cond_src_image_feature = None
-
-        pose_t_cond = self.pose_t_proj(pose_t)
-        pose_s_cond = self.pose_s_proj(pose_s)
-
-        if random.random() < self.args.pose_drop_rate:
-            pose_t_cond = torch.zeros(pose_t_cond.shape, device=pose_t_cond.device)
-        if random.random() < self.args.pose_drop_rate:
-            pose_s_cond = torch.zeros(pose_s_cond.shape, device=pose_t_cond.device)
-
-        pose_s_cond = torch.flatten(pose_s_cond, 2, 3).transpose(1,2)
-        extra_patch_embeddings_s[:,1:,:] += pose_s_cond # 0th embedding is a global embedding
 
         pred_noise = self.unet(noisy_latents, timesteps, class_labels=cond_src_image_feature,
                                encoder_hidden_states=encoder_image_hidden_states,
@@ -287,12 +298,6 @@ class FPDM(pl.LightningModule):
 
         # fusion model load
         self.fusion_model = FusionModel.load_from_checkpoint(self.hparams.fusion_model_path)
-        # self.fusion_model.img_encoder = self.fusion_model.img_encoder
-        # self.fusion_model.pose_encoder = self.fusion_model.pose_encoder
-        # self.fusion_model.combiner = self.fusion_model.combiner
-        # self.fusion_model.attention = self.fusion_model.attention
-
-
 
         if self.hparams.init_src_image_encoder:
             if self.hparams.src_encoder_type == 'clip':
@@ -327,11 +332,6 @@ class FPDM(pl.LightningModule):
         self.src_image_encoder.requires_grad_(False)
         self.vae.requires_grad_(False)
         self.fusion_model.requires_grad_(False)
-        # self.fusion_model.img_encoder.requires_grad_(False)
-        # self.fusion_model.pose_encoder.requires_grad_(False)
-        # self.fusion_model.combiner.requires_grad_(False)
-        # self.fusion_model.attention.requires_grad_(False)
-
         self.sd_model = SDModel(unet=self.unet, args=self.hparams)
 
         self.pipe = FPDM_DiffusionPipeline.from_pretrained(self.hparams.pretrained_model_name_or_path)
@@ -518,9 +518,6 @@ class FPDM(pl.LightningModule):
         cond_src_feature = self.src_image_encoder(src_processed_source_image)
         s_image_patch_embeddings = (cond_src_feature.last_hidden_state) #[:, 1:, :]
 
-        # cond_src_feature = self.src_image_encoder(processed_source_image)
-        # s_image_patch_embeddings = (cond_src_feature.last_hidden_state)[:, 1:, :]
-
         # get fusion embeddings
         embddings_src = self.fusion_model.img_encoder(fusion_processed_source_image)
         embddings_t_pos = self.fusion_model.pose_encoder(fusion_processed_target_pose)
@@ -554,9 +551,10 @@ class FPDM(pl.LightningModule):
 
         # pose image embedding
         pose_t_cond = self.sd_model.pose_t_proj(target_pose)
-        pose_s_cond = self.sd_model.pose_s_proj(source_pose)
-        pose_s_cond = torch.flatten(pose_s_cond, 2, 3).transpose(1,2)
-        s_image_patch_embeddings[:,1:,:] += pose_s_cond # 0th embedding is a global embeddi
+        if self.hparams.src_kpt_encoder:
+            pose_s_cond = self.sd_model.pose_s_proj(source_pose)
+            pose_s_cond = torch.flatten(pose_s_cond, 2, 3).transpose(1,2)
+            s_img_proj_f[:,1:,:] += pose_s_cond # 0th embedding is a global embeddi
 
         output = self.pipe(
             height=self.hparams.model_img_size[1],

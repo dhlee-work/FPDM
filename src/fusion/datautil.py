@@ -42,7 +42,7 @@ class ProcessingKeypoints():
         keypoints[:, 1] = keypoints[:, 1] * scale_h - h
         keypoints[missing_keypoint_index] = -1
         return keypoints
-    def draw_img(self,keypoint, img_size, param):
+    def draw_img(self, keypoint, img_size, param):
         canvas = np.zeros((img_size[0], img_size[1], 3)).astype(np.uint8)
         stickwidth = param['stickwidth']
         for i in range(18):

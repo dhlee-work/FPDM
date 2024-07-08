@@ -14,13 +14,15 @@ import shutil
 def reformat_deepfashion_dataset(dataset_dir, image_list):
     image_dict = {}
     for i in range(len(image_list)):
-        _path0 = image_list[i].replace(dataset_dir, '.')
-        _path_key = image_list[i].replace('./dataset/deepfashion/img', '').replace('_', '').replace('/', '')
+        _path0 = image_list[i].replace(dataset_dir, '.').replace('original_img', 'img')
+        _path_key = image_list[i].replace('./dataset/deepfashion/original_img', '').replace('original_img', 'img').replace('_', '').replace('/', '')
         image_dict[_path_key] = _path0
 
     filenames_train = []
     file_txt = '{}/annotations/fasion-pairs-train.csv'.format(dataset_dir)
     data = np.loadtxt(file_txt, dtype=str, skiprows=1)
+
+    item_list = []
     for i in data:
         source = i.split(',')[0]
         target = i.split(',')[1]
@@ -28,6 +30,17 @@ def reformat_deepfashion_dataset(dataset_dir, image_list):
         target = target.replace('fashion', '').replace('_', '')
         source_path = image_dict[source]
         target_path = image_dict[target]
+        filenames_train.append({'source_image': source_path,
+                                'target_image': target_path})
+
+        item_list.append(source_path)
+        item_list.append(target_path)
+
+    ## self_generate
+    uniq_item_list = list(set(item_list))
+    for j in uniq_item_list:
+        source_path = j
+        target_path = j
         filenames_train.append({'source_image': source_path,
                                 'target_image': target_path})
 
@@ -43,6 +56,7 @@ def reformat_deepfashion_dataset(dataset_dir, image_list):
         target_path = image_dict[target]
         filenames_test.append({'source_image': source_path,
                                'target_image': target_path})
+
     return filenames_train, filenames_test
 
 def reformat_market_dataset(dataset_dir):
@@ -186,19 +200,20 @@ def resize_image(image_list, resized_dirname, ratio):
 def run_preprcessing_deepfashion(resized_dirname, dataset_dir):
     print('image resize preprocessing')
     image_list = glob.glob(os.path.join(dataset_dir, 'original_img/**/*.jpg'), recursive=True)
-    resize_image(image_list, resized_dirname, ratio=0.5)
+    # resize_image(image_list, resized_dirname, ratio=0.5)
 
-    # print('annotation preprocessing')
-    # train_dataset, test_dataset = reformat_deepfashion_dataset(dataset_dir, image_list)
-    # # check if imgs has no pose annotation omit.
-    # train_dataset = omit_image_only(train_dataset, 'train')
-    # test_dataset = omit_image_only(test_dataset, 'test')
-    #
-    # with open(os.path.join(dataset_dir, f'train_pairs_data.json'), 'w') as f:
-    #     json.dump(train_dataset, f)
-    # with open(os.path.join(dataset_dir, f'test_pairs_data.json'), 'w') as f:
-    #     json.dump(test_dataset, f)
-    # print('process finished !! ')
+    print('annotation preprocessing')
+    train_dataset, test_dataset = reformat_deepfashion_dataset(dataset_dir, image_list)
+    # check if imgs has no pose annotation omit.
+    train_dataset = omit_image_only(train_dataset, 'train')
+    test_dataset = omit_image_only(test_dataset, 'test')
+    print(len(train_dataset))
+    with open(os.path.join(dataset_dir, f'train_pairs_data_with_self.json'), 'w') as f:
+        json.dump(train_dataset, f)
+    with open(os.path.join(dataset_dir, f'test_pairs_data.json'), 'w') as f:
+        json.dump(test_dataset, f)
+    print('process finished !! ')
+
 
 def run_preprcessing_market1501(dataset_dir):
     image_list = glob.glob(os.path.join(dataset_dir, 'Market-1501-v15.09.15/**/*.jpg'), recursive=True)
