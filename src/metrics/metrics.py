@@ -347,9 +347,9 @@ class Reconstruction_Metrics():
             name = os.path.basename(input_image_list[index])
             names.append(name)
 
-            img_gt = Image.open(gt_image_list[index]).convert("RGB").resize(img_size, Image.BICUBIC)
+            img_gt = Image.open(gt_image_list[index]).convert("RGB").resize(img_size,Image.BICUBIC)
             img_gt = np.array(img_gt)/255.
-            img_pred = Image.open(input_image_list[index]).convert("RGB").resize(img_size, Image.BICUBIC)
+            img_pred = Image.open(input_image_list[index]).convert("RGB").resize(img_size,Image.BICUBIC)
             img_pred = np.array(img_pred)/255.
 
             if debug != 0:
@@ -512,6 +512,9 @@ class LPIPS():
             imgs_1 = imgs_1.transpose((0, 3, 1, 2))
             imgs_2 = imgs_2.transpose((0, 3, 1, 2))
 
+            # imgs_1 = imgs_1*2 - 1
+            # imgs_2 = imgs_2*2 - 1
+
             img_1_batch = torch.from_numpy(imgs_1).type(torch.FloatTensor)
             img_2_batch = torch.from_numpy(imgs_2).type(torch.FloatTensor)
 
@@ -520,7 +523,7 @@ class LPIPS():
                 img_2_batch = img_2_batch.cuda()
 
                 with torch.no_grad():
-                    result = self.model.forward(img_1_batch, img_2_batch, normalize=True)
+                    result = self.model.forward(img_1_batch, img_2_batch)
 
             results.append(result)
 
