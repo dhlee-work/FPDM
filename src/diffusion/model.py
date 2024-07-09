@@ -417,9 +417,9 @@ class FPDM(pl.LightningModule):
         trans_s_pose = self.transform_totensor(s_pose.resize([512, 512],
                                                              Image.BICUBIC)).to(self.dtype).to(self.device).unsqueeze(0)
 
-        src_processed_s_img = (self.src_image_processor(images=s_img,
+        src_processed_s_img = (self.src_image_processor(images=s_img.resize([512, 512], Image.BICUBIC),
                                                 return_tensors="pt").pixel_values).to(self.dtype).to(self.device)
-        fusion_processed_s_img = (self.fusion_image_processor(images=s_img,
+        fusion_processed_s_img = (self.fusion_image_processor(images=s_img.resize([224, 224], Image.BICUBIC),
                                                 return_tensors="pt").pixel_values).to(self.dtype).to(self.device)
         fusion_processed_t_pose = (self.fusion_image_processor(images=t_pose.resize([224, 224], Image.BICUBIC),
                                                  return_tensors="pt").pixel_values).to(self.dtype).to(self.device)

@@ -113,13 +113,6 @@ class FID():
     def calculate_from_disk(self, generated_path, gt_path, img_size):
         """
         """
-        # if not os.path.exists(gt_path):
-        #     raise RuntimeError('Invalid path: %s' % gt_path)
-        # if not os.path.exists(generated_path):
-        #     raise RuntimeError('Invalid path: %s' % generated_path)
-
-        # print('exp-path - ' + generated_path)
-
         print('calculate gt_path statistics...')
         m1, s1 = self.compute_statistics_of_path(gt_path, self.verbose, img_size)
         print('calculate generated_path statistics...')
@@ -133,7 +126,7 @@ class FID():
 
         files = path #list(path.glob('*.jpg')) + list(path.glob('*.png'))
         imgs = (np.array(
-            [np.array(Image.open(str(fn)).resize(img_size, Image.BICUBIC)) / 255. for fn in
+            [np.array(Image.open(str(fn)).convert("RGB").resize(img_size, Image.BICUBIC)) / 255. for fn in
              files]))
         # imgs = (np.array(
         #     [(cv2.resize(cv2.imread(str(fn)).astype(np.float32), img_size, interpolation=cv2.INTER_CUBIC)) for fn in
@@ -526,5 +519,5 @@ class LPIPS():
 
         distance = torch.cat(results, 0)[:, 0, 0, 0].mean()
 
-        print('lpips: %.3f' % distance)
+        print('lpips: %.6f' % distance)
         return distance

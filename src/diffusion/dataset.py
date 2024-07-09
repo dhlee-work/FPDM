@@ -92,9 +92,9 @@ class FPDM_Dataset(Dataset):
     def transforms(self, source_img, target_img, s_keypoint, t_keypoint):
         # Random crop
         # t_keypoint
-        t_keypoint2 = t_keypoint.copy()
+        # t_keypoint2 = t_keypoint.copy()
         pose_size = [375, 550]
-        s_pose = self.PK.draw_img(s_keypoint, [pose_size[1], pose_size[0]], self.kpt_param)
+        # s_pose = self.PK.draw_img(s_keypoint, [pose_size[1], pose_size[0]], self.kpt_param)
         if random.random() < 1.0:
             kpt_shape = t_keypoint.shape
             random_noise = np.random.normal(0, 1, kpt_shape[0]*kpt_shape[1]).reshape(kpt_shape)
@@ -175,8 +175,8 @@ class FPDM_Dataset(Dataset):
         trans_t_pose = self.transform_totensor(t_pose.resize(self.model_img_size, Image.BICUBIC))
         trans_s_pose = self.transform_totensor(s_pose.resize([512, 512], Image.BICUBIC))
 
-        src_processed_s_img = (self.src_image_processor(images=s_img, return_tensors="pt").pixel_values).squeeze(dim=0)
-        fusion_processed_s_img = (self.fusion_image_processor(images=s_img, return_tensors="pt").pixel_values).squeeze(dim=0)
+        src_processed_s_img = (self.src_image_processor(images=s_img.resize([512, 512], Image.BICUBIC), return_tensors="pt").pixel_values).squeeze(dim=0)
+        fusion_processed_s_img = (self.fusion_image_processor(images=s_img.resize([224, 224], Image.BICUBIC), return_tensors="pt").pixel_values).squeeze(dim=0)
         fusion_processed_t_pose = (self.fusion_image_processor(images=t_pose.resize([224, 224], Image.BICUBIC),
                                                                return_tensors="pt").pixel_values).squeeze(dim=0)
 
