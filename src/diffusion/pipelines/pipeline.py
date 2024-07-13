@@ -228,51 +228,51 @@ class FPDM_DiffusionPipeline(DiffusionPipeline):
             ):
                 return torch.device(module._hf_hook.execution_device)
         return self.device
-
-    def _encode_prompt(
-            self,
-            prompt,
-            device,
-            num_images_per_prompt,
-            do_classifier_free_guidance,
-            s_img_proj_f=None,
-            pred_t_img_embed=None,
-            lora_scale: Optional[float] = None,
-
-    ):
-
-        if lora_scale is not None and isinstance(self, LoraLoaderMixin):
-            self._lora_scale = lora_scale
-
-        if prompt is not None and isinstance(prompt, str):
-            batch_size = 1
-        elif prompt is not None and isinstance(prompt, list):
-            batch_size = len(prompt)
-        else:
-            batch_size = s_img_proj_f.shape[0]
-
-        ###################  s_image_pro_j  #####################
-        s_image_proj_f = s_img_proj_f  # .to(device=device)
-        pred_t_image_embed = pred_t_img_embed  # .to(device=device)
-
-        s_bs_embed, s_seq_len, _ = s_image_proj_f.shape
-
-        if do_classifier_free_guidance:
-
-            s_image_proj_f = torch.cat([s_image_proj_f, pred_t_image_embed], dim=1)
-
-            s_image_proj_f = s_image_proj_f.repeat(1, num_images_per_prompt, 1)
-            s_image_proj_f = s_image_proj_f.view(s_bs_embed * num_images_per_prompt, s_seq_len + 1, -1)  # 4,64,1024
-
-            negative_prompt_embeds = torch.zeros(s_image_proj_f.shape).to(device, dtype=torch.float16)
-            s_image_proj_f = torch.cat([negative_prompt_embeds, s_image_proj_f], dim=0)
-
-        else:
-            s_image_proj_f = s_image_proj_f.repeat(1, num_images_per_prompt, 1)
-            s_image_proj_f = s_image_proj_f.view(s_bs_embed * num_images_per_prompt, s_seq_len, -1)  # 4,64,1024
-
-        s_image_prompt_embeds = s_image_proj_f
-        return s_image_prompt_embeds
+    #
+    # def _encode_prompt(
+    #         self,
+    #         prompt,
+    #         device,
+    #         num_images_per_prompt,
+    #         do_classifier_free_guidance,
+    #         s_img_proj_f=None,
+    #         pred_t_img_embed=None,
+    #         lora_scale: Optional[float] = None,
+    #
+    # ):
+    #
+    #     if lora_scale is not None and isinstance(self, LoraLoaderMixin):
+    #         self._lora_scale = lora_scale
+    #
+    #     if prompt is not None and isinstance(prompt, str):
+    #         batch_size = 1
+    #     elif prompt is not None and isinstance(prompt, list):
+    #         batch_size = len(prompt)
+    #     else:
+    #         batch_size = s_img_proj_f.shape[0]
+    #
+    #     ###################  s_image_pro_j  #####################
+    #     s_image_proj_f = s_img_proj_f  # .to(device=device)
+    #     pred_t_image_embed = pred_t_img_embed  # .to(device=device)
+    #
+    #     s_bs_embed, s_seq_len, _ = s_image_proj_f.shape
+    #
+    #     if do_classifier_free_guidance:
+    #
+    #         s_image_proj_f = torch.cat([s_image_proj_f, pred_t_image_embed], dim=1)
+    #
+    #         s_image_proj_f = s_image_proj_f.repeat(1, num_images_per_prompt, 1)
+    #         s_image_proj_f = s_image_proj_f.view(s_bs_embed * num_images_per_prompt, s_seq_len + 1, -1)  # 4,64,1024
+    #
+    #         negative_prompt_embeds = torch.zeros(s_image_proj_f.shape).to(device, dtype=torch.float16)
+    #         s_image_proj_f = torch.cat([negative_prompt_embeds, s_image_proj_f], dim=0)
+    #
+    #     else:
+    #         s_image_proj_f = s_image_proj_f.repeat(1, num_images_per_prompt, 1)
+    #         s_image_proj_f = s_image_proj_f.view(s_bs_embed * num_images_per_prompt, s_seq_len, -1)  # 4,64,1024
+    #
+    #     s_image_prompt_embeds = s_image_proj_f
+    #     return s_image_prompt_embeds
 
     def decode_latents(self, latents):
         warnings.warn(
@@ -394,7 +394,7 @@ class FPDM_DiffusionPipeline(DiffusionPipeline):
             t_image: Optional[torch.FloatTensor] = None,
             s_img_proj_f: Optional[torch.FloatTensor] = None,
             t_pose_f: Optional[torch.FloatTensor] = None,
-            pred_t_img_embed: Optional[torch.FloatTensor] = None,
+            # pred_t_img_embed: Optional[torch.FloatTensor] = None,
             fusion_img_embed: Optional[torch.FloatTensor] = None,
             noise_offset : float = None,
             args = None
@@ -419,17 +419,11 @@ class FPDM_DiffusionPipeline(DiffusionPipeline):
             pose_cond = torch.cat([neg_pos_f, pose_cond], dim=0)
 
         # source patch feature + pred. target patch feature
-        if args.fusion_image_patch_encoder:
-            feature_f = torch.cat([s_img_proj_f, pred_t_img_embed], dim=1)
-            # if not args.fusion_patch_embed_ahead:
-            #     if args.proj_embd_concat:
-            #         feature_f = torch.cat([s_img_proj_f, pred_t_img_embed], dim=1)
-            #     else:
-            #         feature_f = s_img_proj_f + pred_t_img_embed
-            # else:
-            #     feature_f = s_img_proj_f
-        else:
-            feature_f = s_img_proj_f
+        # if args.fusion_image_patch_encoder:
+        #     feature_f = torch.cat([s_img_proj_f, pred_t_img_embed], dim=1)
+        # else:
+        #     feature_f = s_img_proj_f
+        feature_f = s_img_proj_f
         feature_f = feature_f.repeat(bs * num_images_per_prompt, 1, 1).to(device=device)  # dtype=torch.float16,
         # target feature
         # prior_embed = pred_t_img_embed.repeat(bs * num_images_per_prompt, 1, 1).to(device=device) #, dtype=torch.float16
@@ -481,8 +475,8 @@ class FPDM_DiffusionPipeline(DiffusionPipeline):
             for i, t in enumerate(timesteps):
                 # if args.noise_offset:
                 #     latents += args.noise_offset * torch.randn(
-                #         (latents.shape[0], latents.shape[1], 1, 1), device=latents.device
-                #     )
+                #         (latents.shape[0], latents.shape[1], 1, 1), device=latents.device)
+                # #     )
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = torch.cat([latents] * 2) if do_classifier_free_guidance else latents
                 # latent_model_input = torch.cat([latents] * 3) if do_classifier_free_guidance else latents

@@ -143,11 +143,11 @@ test_dataset = FusionDataset(test_dataset, args)
 test_dataloader = DataLoader(test_dataset,
                              num_workers=args.num_workers,
                              batch_size=args.batch_size,
-                             shuffle=False,
+                             shuffle=True,
                              drop_last=False,
                              pin_memory=True)
 
-fusion_model = FusionModel.load_from_checkpoint('./logs/deepfashion-fusion-CLIP-b48-p005-r03-epoch3-lr1e-5-wd1e-4/2024-06-10T05-03-40/last.ckpt')
+fusion_model = FusionModel.load_from_checkpoint('./logs/deepfashion-fusion-CLIP-b48-p005-r10-epoch5-lr1e-5-wd1e-4-globalonly/2024-07-13T09-16-39/last.ckpt')
     # './logs/deepfashion-fusion-CLIP-patch-learning-b48/2024-05-31T10-43-40/last.ckpt')
 #  deepfashion-fusion-CLIP-b48-r10-p005/2024-06-07T09-32-43
 # deepfashion-fusion-CLIP-patch-learning-b48-notrans-self/2024-06-02T05-22-43
@@ -274,7 +274,7 @@ plt.show()
 plt.hist(aa, bins=15, alpha=0.8)
 # plt.hist(bb, alpha=0.5)
 plt.hist(cc, bins=15, alpha=0.8)
-plt.hist(dd, bins=15, alpha=0.8)
+# plt.hist(dd, bins=15, alpha=0.8)
 plt.show()
 
 np.mean(aa)

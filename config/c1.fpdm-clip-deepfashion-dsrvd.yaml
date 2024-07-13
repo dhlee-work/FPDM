@@ -41,8 +41,8 @@ fusion_encoder_path: 'openai/clip-vit-large-patch14' #'facebook/dinov2-base' # '
 fusion_encoder_type: 'clip' # 'clip', 'dino'
 init_src_image_encoder: true
 fusion_image_encoder: true
-fusion_image_patch_encoder: true
-proj_fusion_image_patch_encoder: true
+fusion_image_patch_encoder: false
+proj_fusion_image_patch_encoder: false
 proj_embds_sum: false
 proj_embd_concat: true
 patch_proj_in_dim: 1024
