@@ -56,7 +56,7 @@ class InceptionV3(nn.Module):
 
         self.blocks = nn.ModuleList()
 
-        inception = models.inception_v3(pretrained=True)
+        inception = models.inception_v3(weights=models.Inception_V3_Weights.IMAGENET1K_V1)
         # Block 0: input to maxpool1
         block0 = [
             inception.Conv2d_1a_3x3,
@@ -118,7 +118,7 @@ class InceptionV3(nn.Module):
         x = inp
 
         if self.resize_input:
-            x = F.upsample(x, size=(299, 299), mode='bilinear')
+            x = F.interpolate(x, size=(299, 299), mode='bilinear')
 
         if self.normalize_input:
             x = x.clone()

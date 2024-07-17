@@ -180,6 +180,7 @@ class SDModel(torch.nn.Module):
 
         # self.fusionpatch_proj_model = FusionPatch_ProjModel(in_dim=self.args.patch_proj_in_dim, hidden_dim=768, out_dim=1024,
         #                                            dropout=self.args.proj_drop_rate)
+
         self.pose_t_proj = ControlNetConditioningEmbedding(
             conditioning_embedding_channels=320,
             block_out_channels=(16, 32, 96, 256),
@@ -309,7 +310,7 @@ class FPDM(pl.LightningModule):
             self.src_image_encoder = self.fusion_model.img_encoder
 
         self.src_image_processor = AutoImageProcessor.from_pretrained(self.hparams.src_encoder_path)  # 앞으로 빼기
-        self.src_image_processor.size['shortest_edge'] = 512  ###224
+        self.src_image_processor.size['shortest_edge'] = self.hparams.src_encoder_size[0]  ###224
         self.src_image_processor.do_center_crop = False
 
         self.fusion_image_processor = AutoImageProcessor.from_pretrained(self.hparams.fusion_encoder_path)  # 앞으로 빼기
@@ -408,7 +409,7 @@ class FPDM(pl.LightningModule):
         trans_s_pose = self.transform_totensor(s_pose.resize([512, 512],
                                                              Image.BICUBIC)).to(self.dtype).to(self.device).unsqueeze(0)
 
-        src_processed_s_img = (self.src_image_processor(images=s_img.resize([512, 512], Image.BICUBIC), ###224
+        src_processed_s_img = (self.src_image_processor(images=s_img.resize( self.hparams.src_encoder_size, Image.BICUBIC), ###224
                                                 return_tensors="pt").pixel_values).to(self.dtype).to(self.device)
         fusion_processed_s_img = (self.fusion_image_processor(images=s_img.resize([224, 224], Image.BICUBIC),
                                                 return_tensors="pt").pixel_values).to(self.dtype).to(self.device)

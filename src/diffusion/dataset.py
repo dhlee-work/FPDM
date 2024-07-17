@@ -41,6 +41,7 @@ class FPDM_Dataset(Dataset):
             fusion_encoder_path=None,
             model_img_size=(512, 512),
             img_size=(512, 512),
+            src_encoder_size=(512,512),
             imgs_drop_rate=0.0,
             pose_drop_rate=0.0,
             pose_erase_rate=0.02
@@ -50,7 +51,7 @@ class FPDM_Dataset(Dataset):
         else:
             self.data = json_file
         self.image_root_path = image_root_path
-
+        self.src_encoder_size = src_encoder_size
         self.phase = phase
         self.img_size = img_size
         self.model_img_size = model_img_size
@@ -60,7 +61,7 @@ class FPDM_Dataset(Dataset):
         self.src_encoder_path = src_encoder_path
         self.fusion_encoder_path = fusion_encoder_path
         self.src_image_processor = AutoImageProcessor.from_pretrained(self.src_encoder_path)  # 앞으로 빼기
-        self.src_image_processor.size['shortest_edge'] = 512
+        self.src_image_processor.size['shortest_edge'] = self.src_encoder_size[0]
         self.src_image_processor.do_center_crop = False
 
         self.fusion_image_processor = AutoImageProcessor.from_pretrained(self.fusion_encoder_path)  # 앞으로 빼기
@@ -173,9 +174,9 @@ class FPDM_Dataset(Dataset):
 
         trans_t_img = self.transform_normalize(self.transform_totensor(t_img))
         trans_t_pose = self.transform_totensor(t_pose.resize(self.model_img_size, Image.BICUBIC))
-        trans_s_pose = self.transform_totensor(s_pose.resize([512, 512], Image.BICUBIC))
+        trans_s_pose = self.transform_totensor(s_pose.resize(self.src_encoder_size, Image.BICUBIC)) ###224
 
-        src_processed_s_img = (self.src_image_processor(images=s_img.resize([512, 512], Image.BICUBIC), return_tensors="pt").pixel_values).squeeze(dim=0)  ###224
+        src_processed_s_img = (self.src_image_processor(images=s_img.resize(self.src_encoder_size, Image.BICUBIC), return_tensors="pt").pixel_values).squeeze(dim=0)  ###224
         fusion_processed_s_img = (self.fusion_image_processor(images=s_img.resize([224, 224], Image.BICUBIC), return_tensors="pt").pixel_values).squeeze(dim=0)
         fusion_processed_t_pose = (self.fusion_image_processor(images=t_pose.resize([224, 224], Image.BICUBIC),
                                                                return_tensors="pt").pixel_values).squeeze(dim=0)

@@ -14,13 +14,14 @@ import numpy as np
 import skimage
 import torch
 from imageio import imread
-
+import pickle
 from scipy import linalg
 from skimage.metrics import peak_signal_noise_ratio as compare_psnr
 from skimage.metrics import structural_similarity as compare_ssim
 from torch.nn.functional import adaptive_avg_pool2d
 from PIL import Image
 from src.metrics.inception import InceptionV3
+
 
 print(skimage.__version__)
 
@@ -53,114 +54,50 @@ class FID():
     """
 
     def __init__(self):
+        super().__init__()
+
         self.dims = 2048
-        self.batch_size = 128
+        self.batch_size = 10
         self.cuda = True
         self.verbose = False
 
-        inception = models.inception_v3(weights=models.Inception_V3_Weights.IMAGENET1K_V1)
-        self.inception_blocks = nn.Sequential(
-            inception.Conv2d_1a_3x3,
-            inception.Conv2d_2a_3x3,
-            inception.Conv2d_2b_3x3,
-            nn.MaxPool2d(kernel_size=3, stride=2),
-            inception.Conv2d_3b_1x1,
-            inception.Conv2d_4a_3x3,
-            nn.MaxPool2d(kernel_size=3, stride=2),
-            inception.Mixed_5b,
-            inception.Mixed_5c,
-            inception.Mixed_5d,
-            inception.Mixed_6a,
-            inception.Mixed_6b,
-            inception.Mixed_6c,
-            inception.Mixed_6d,
-            inception.Mixed_6e,
-            inception.Mixed_7a,
-            inception.Mixed_7b,
-            inception.Mixed_7c,
-            nn.AdaptiveAvgPool2d(output_size=(1, 1))
-        )
-
+        block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[self.dims]
+        self.model = InceptionV3([block_idx])
         if self.cuda:
             # TODO: put model into specific GPU
-            self.inception_blocks.cuda()
+            self.model.cuda()
 
-        self.inception_blocks.eval()
-        self.inception_blocks.requires_grad_(False)
+        self.model.eval()
 
-    def forward_inception(self, x):
-        x = F.interpolate(x, size=(299, 299), mode='bilinear')
-        x[:, 0] = x[:, 0] * (0.229 / 0.5) + (0.485 - 0.5) / 0.5
-        x[:, 1] = x[:, 1] * (0.224 / 0.5) + (0.456 - 0.5) / 0.5
-        x[:, 2] = x[:, 2] * (0.225 / 0.5) + (0.406 - 0.5) / 0.5
-        out = self.inception_blocks(x)
-        return out
 
-    def __call__(self, images, gt_images):
-        """ images:  list of the generated image. The values must lie between 0 and 1.
-            gt_path: the path of the ground truth images.  The values must lie between 0 and 1.
-        """
-        # if not os.path.exists(gt_path):
-        #     raise RuntimeError('Invalid path: %s' % gt_path)
 
-        print('calculate gt_path statistics...')
-        m1, s1 = self.calculate_activation_statistics(gt_images, self.verbose)
-        print('calculate generated_images statistics...')
-        m2, s2 = self.calculate_activation_statistics(images, self.verbose)
-        fid_value = self.calculate_frechet_distance(m1, s1, m2, s2)
-        return fid_value
-
-    def calculate_from_disk(self, generated_path, gt_path, img_size):
-        """
-        """
-        print('calculate gt_path statistics...')
-        m1, s1 = self.compute_statistics_of_path(gt_path, self.verbose, img_size)
-        print('calculate generated_path statistics...')
-        m2, s2 = self.compute_statistics_of_path(generated_path, self.verbose, img_size)
-        print('calculate frechet distance...')
+    def calculate_batch(self, fid_pred_data, fid_real_data):
+        print('calculate gt statistics...')
+        m1, s1 = self.compute_statistics_of_loader(fid_real_data, self.verbose, type='gt')
+        print('calculate pred statistics...')
+        m2, s2 = self.compute_statistics_of_loader(fid_pred_data, self.verbose, type='gt')
         fid_value = self.calculate_frechet_distance(m1, s1, m2, s2)
         print('fid_distance %f' % (fid_value))
         return fid_value
 
-    def compute_statistics_of_path(self, path, verbose, img_size):
 
-        files = path #list(path.glob('*.jpg')) + list(path.glob('*.png'))
-        imgs = (np.array(
-            [np.array(Image.open(str(fn)).convert("RGB").resize(img_size, Image.BICUBIC)) / 255. for fn in
-             files]))
-        # imgs = (np.array(
-        #     [(cv2.resize(cv2.imread(str(fn)).astype(np.float32), img_size, interpolation=cv2.INTER_CUBIC)) for fn in
-        #      files])) / 255.0
-        # Bring images to shape (B, 3, H, W)
-        imgs = imgs.transpose((0, 3, 1, 2))
 
-        # Rescale images to be between 0 and 1
-        m, s = self.calculate_activation_statistics(imgs, verbose)
-        return m, s
+    def compute_statistics_of_loader(self, fid_data, verbose, type='gt'):
+        for i, fid_imgs in enumerate(fid_data):
+            if self.cuda:
+                fid_imgs = fid_imgs.cuda()
+            act = self.get_activations(fid_imgs, verbose)
+            if i == 0:
+                out_gathered = act.cpu().numpy()
+            else:
+                out_gathered = np.concatenate((out_gathered, act.cpu().numpy()))
 
-    def calculate_activation_statistics(self, images, verbose):
-        """Calculation of the statistics used by the FID.
-        Params:
-        -- images      : Numpy array of dimension (n_images, 3, hi, wi). The values
-                         must lie between 0 and 1.
-        -- model       : Instance of inception model
-        -- batch_size  : The images numpy array is split into batches with
-                         batch size batch_size. A reasonable batch size
-                         depends on the hardware.
-        -- dims        : Dimensionality of features returned by Inception
-        -- cuda        : If set to True, use GPU
-        -- verbose     : If set to True and parameter out_step is given, the
-                         number of calculated batches is reported.
-        Returns:
-        -- mu    : The mean over samples of the activations of the pool_3 layer of
-                   the inception model.
-        -- sigma : The covariance matrix of the activations of the pool_3 layer of
-                   the inception model.
-        """
-        act = self.get_activations(images, verbose)
-        mu = np.mean(act, axis=0)
-        sigma = np.cov(act, rowvar=False)
+        out_gathered = out_gathered.reshape(out_gathered.shape[0], -1)
+        mu = np.mean(out_gathered, axis=0)
+        sigma = np.cov(out_gathered, rowvar=False)
         return mu, sigma
+
+
 
     def get_activations(self, images, verbose=False):
         """Calculates the activations of the pool_3 layer for all images.
@@ -180,43 +117,46 @@ class FID():
            activations of the given tensor when feeding inception with the
            query tensor.
         """
-        self.inception_blocks.eval()
-
-        d0 = images.shape[0]
-        if self.batch_size > d0:
-            print(('Warning: batch size is bigger than the data size. '
-                   'Setting batch size to data size'))
-            self.batch_size = d0
-
-        n_batches = d0 // self.batch_size
-        n_used_imgs = n_batches * self.batch_size
-
-        pred_arr = np.empty((n_used_imgs, self.dims))
-        for i in range(n_batches):
-            if verbose:
-                print('\rPropagating batch %d/%d' % (i + 1, n_batches))
-                # end='', flush=True)
-            start = i * self.batch_size
-            end = start + self.batch_size
-
-            batch = torch.from_numpy(images[start:end]).type(torch.FloatTensor)
-            # batch = Variable(batch, volatile=True)
-            if self.cuda:
-                batch = batch.cuda()
-
-            pred = self.forward_inception(batch)
-
-            # If model output is not scalar, apply global spatial average pooling.
-            # This happens if you choose a dimensionality not equal 2048.
-            # if pred.shape[2] != 1 or pred.shape[3] != 1:
-            #     pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
-
-            pred_arr[start:end] = pred.cpu().data.numpy().reshape(self.batch_size, -1)
-
-        if verbose:
-            print(' done')
-
-        return pred_arr
+        self.model.eval()
+        # self.inception_blocks.eval()
+        pred = self.model(images)[0]
+        return pred
+        # d0 = images.shape[0]
+        # if self.batch_size > d0:
+        #     print(('Warning: batch size is bigger than the data size. '
+        #            'Setting batch size to data size'))
+        #     self.batch_size = d0
+        #
+        # n_batches = d0 // self.batch_size
+        # n_used_imgs = n_batches * self.batch_size
+        #
+        # pred_arr = np.empty((n_used_imgs, self.dims))
+        # for i in range(n_batches):
+        #     if verbose:
+        #         print('\rPropagating batch %d/%d' % (i + 1, n_batches))
+        #         # end='', flush=True)
+        #     start = i * self.batch_size
+        #     end = start + self.batch_size
+        #
+        #     batch = torch.from_numpy(images[start:end]).type(torch.FloatTensor)
+        #     # batch = Variable(batch, volatile=True)
+        #     if self.cuda:
+        #         batch = batch.cuda()
+        #     pred = self.model(batch)[0]
+        #
+        #     # pred = self.forward_inception(batch).reshape(self.batch_size, -1)
+        #
+        #     # If model output is not scalar, apply global spatial average pooling.
+        #     # This happens if you choose a dimensionality not equal 2048.
+        #     if pred.shape[2] != 1 or pred.shape[3] != 1:
+        #         pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
+        #
+        #     pred_arr[start:end] = pred.cpu().data.numpy().reshape(self.batch_size, -1)
+        #
+        # if verbose:
+        #     print(' done')
+        #
+        # return pred_arr
 
     def calculate_frechet_distance(self, mu1, sigma1, mu2, sigma2, eps=1e-6):
         """Numpy implementation of the Frechet Distance.
@@ -270,7 +210,84 @@ class FID():
 
         return (diff.dot(diff) + np.trace(sigma1) +
                 np.trace(sigma2) - 2 * tr_covmean)
-
+    # def __call__(self, images, gt_images):
+    #     """ images:  list of the generated image. The values must lie between 0 and 1.
+    #         gt_path: the path of the ground truth images.  The values must lie between 0 and 1.
+    #     """
+    #     # if not os.path.exists(gt_path):
+    #     #     raise RuntimeError('Invalid path: %s' % gt_path)
+    #
+    #     print('calculate gt_path statistics...')
+    #     m1, s1 = self.calculate_activation_statistics(gt_images, self.verbose)
+    #     print('calculate generated_images statistics...')
+    #     m2, s2 = self.calculate_activation_statistics(images, self.verbose)
+    #     fid_value = self.calculate_frechet_distance(m1, s1, m2, s2)
+    #     return fid_value
+    # def calculate_from_disk(self, generated_path, gt_path, img_size):
+    #     """
+    #     """
+    #     print('calculate gt_path statistics...')
+    #     m1, s1 = self.compute_statistics_of_path(gt_path, self.verbose, img_size, type='gt')
+    #     print('calculate generated_path statistics...')
+    #     m2, s2 = self.compute_statistics_of_path(generated_path, self.verbose, img_size, type='pred')
+    #     print('calculate frechet distance...')
+    #     fid_value = self.calculate_frechet_distance(m1, s1, m2, s2)
+    #     print('fid_distance %f' % (fid_value))
+    #     return fid_value
+    # def compute_statistics_of_path(self, path, verbose, img_size, type='gt'):
+    #     # if type == 'gt':
+    #     #     root_path = '/'.join(path[0].split('/')[:3])
+    #     #     file_path = os.path.join(root_path, 'gt_fid_statistics.pkl')
+    #     #     if os.path.exists(file_path):
+    #     #         gt_fid_stat = pickle.load(open(file_path, 'rb'))
+    #     #         # with open(file=file_path, mode='rb') as f:
+    #     #         #     gt_fid_stat = pickle.load(f)
+    #     #         m, s = gt_fid_stat
+    #     #         return m, s
+    #     files = path
+    #     h, w, c = np.array(Image.open(str(files[0])).convert("RGB").resize(img_size, Image.BICUBIC)).shape
+    #     imgs = np.empty((len(files), h, w, c))
+    #
+    #     for i in range(len(files)):
+    #         img = np.array(Image.open(str(files[i])).convert("RGB").resize(img_size, Image.BICUBIC)).astype(np.float32) / 255.
+    #         imgs[i] = img
+    #         print(i)
+    #
+    #     imgs = imgs.transpose((0, 3, 1, 2))
+    #
+    #     # Rescale images to be between 0 and 1
+    #     m, s = self.calculate_activation_statistics(imgs, verbose)
+    #     if type == 'gt':
+    #         root_path = '/'.join(path[0].split('/')[:3])
+    #         file_path = os.path.join(root_path, 'gt_fid_statistics.pkl')
+    #         if not os.path.exists(file_path):
+    #             with open(file=file_path, mode='wb') as f:
+    #                 pickle.dump([m, s], f)
+    #     return m, s
+    #
+    # def calculate_activation_statistics(self, images, verbose):
+    #     """Calculation of the statistics used by the FID.
+    #     Params:
+    #     -- images      : Numpy array of dimension (n_images, 3, hi, wi). The values
+    #                      must lie between 0 and 1.
+    #     -- model       : Instance of inception model
+    #     -- batch_size  : The images numpy array is split into batches with
+    #                      batch size batch_size. A reasonable batch size
+    #                      depends on the hardware.
+    #     -- dims        : Dimensionality of features returned by Inception
+    #     -- cuda        : If set to True, use GPU
+    #     -- verbose     : If set to True and parameter out_step is given, the
+    #                      number of calculated batches is reported.
+    #     Returns:
+    #     -- mu    : The mean over samples of the activations of the pool_3 layer of
+    #                the inception model.
+    #     -- sigma : The covariance matrix of the activations of the pool_3 layer of
+    #                the inception model.
+    #     """
+    #     act = self.get_activations(images, verbose)
+    #     mu = np.mean(act, axis=0)
+    #     sigma = np.cov(act, rowvar=False)
+    #     return mu, sigma
 
 class Reconstruction_Metrics():
     def __init__(self, metric_list=['ssim', 'psnr', 'l1', 'mae'], data_range=1, win_size=51, multichannel=True):
