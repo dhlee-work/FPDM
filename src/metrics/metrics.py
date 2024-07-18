@@ -379,7 +379,7 @@ class Reconstruction_Metrics():
 
             img_gt_256 = img_gt * 255.0
             img_pred_256 = img_pred * 255.0
-            ssim_256.append(compare_ssim(img_gt_256, img_pred_256, gaussian_weights=True, sigma=1.5,
+            ssim_256.append(compare_ssim(img_gt_256, img_pred_256, gaussian_weights=True, sigma=1.2,
                                          use_sample_covariance=False, channel_axis=2, multichannel=True,
                                          data_range=img_pred_256.max() - img_pred_256.min()))
             if np.mod(index, 200) == 0:
@@ -530,7 +530,7 @@ class LPIPS():
                 img_2_batch = img_2_batch.cuda()
 
                 with torch.no_grad():
-                    result = self.model.forward(img_1_batch, img_2_batch, normalize=True)
+                    result = self.model.forward(img_1_batch, img_2_batch, normalize=False)
 
             results.append(result)
 

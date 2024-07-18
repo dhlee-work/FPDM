@@ -22,6 +22,8 @@ def FPDM_Collate_fn(data):
     source_pose = torch.stack([example["trans_s_pose"] for example in data])
     target_image = torch.stack([example["trans_t_img"] for example in data])
 
+    source_path = [example["source_path"] for example in data]
+    target_path = [example["target_path"] for example in data]
     return {
         "src_processed_source_image" : src_processed_source_image,
         "fusion_processed_source_image": fusion_processed_source_image,
@@ -29,6 +31,8 @@ def FPDM_Collate_fn(data):
         "source_pose": source_pose,
         "target_pose": target_pose,
         "target_image": target_image,
+        'target_path': target_path,
+        'source_path': source_path,
     }
 
 class FPDM_Dataset(Dataset):
@@ -191,6 +195,8 @@ class FPDM_Dataset(Dataset):
             "trans_t_img": trans_t_img,
             "trans_t_pose": trans_t_pose,
             "trans_s_pose": trans_s_pose,
+            "source_path" : s_img_path,
+            "target_path" : t_img_path
         }
 
     def kpt_resize(self, keypoint, pad_val, resize):

@@ -424,7 +424,8 @@ class FPDM_DiffusionPipeline(DiffusionPipeline):
         # else:
         #     feature_f = s_img_proj_f
         feature_f = s_img_proj_f
-        feature_f = feature_f.repeat(bs * num_images_per_prompt, 1, 1).to(device=device)  # dtype=torch.float16,
+        # feature_f = feature_f.repeat(bs * num_images_per_prompt, 1, 1).to(device=device)  # dtype=torch.float16,
+        feature_f = feature_f.repeat(1 * num_images_per_prompt, 1, 1).to(device=device)  #
         # target feature
         # prior_embed = pred_t_img_embed.repeat(bs * num_images_per_prompt, 1, 1).to(device=device) #, dtype=torch.float16
         if fusion_img_embed is not None:
@@ -438,7 +439,7 @@ class FPDM_DiffusionPipeline(DiffusionPipeline):
             # source feature + target feature
             neg_feature_f = torch.zeros(feature_f.shape).to(device)  # , dtype=torch.float16
             feature_f = torch.cat([neg_feature_f, feature_f], dim=0)
-            # feature_f = torch.cat([neg_feature_f, feature_f, neg_feature_f], dim=0)
+
             # target global feature
             if fusion_img_embed is not None:
                 neg_prior_embed = torch.zeros(prior_embed.shape).to(device)  # , dtype=torch.float16
@@ -479,7 +480,6 @@ class FPDM_DiffusionPipeline(DiffusionPipeline):
                 # #     )
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = torch.cat([latents] * 2) if do_classifier_free_guidance else latents
-                # latent_model_input = torch.cat([latents] * 3) if do_classifier_free_guidance else latents
                 latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
                 # noise_mask_maskedimage_latents =  torch.cat([latent_model_input, mask, masked_latents], dim=1).to(dtype=torch.float16)
                 noise_latents = latent_model_input  # .to(dtype=torch.float16)
