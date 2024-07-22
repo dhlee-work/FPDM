@@ -228,7 +228,7 @@ def run_preprcessing_sign(dataset_dir):
     print('process finished !! ')
 
 root_dir = './dataset'
-dataset = 'deepfashion'# 'sign' #'market1501' # sign one_video_test
+dataset = 'sign'# 'sign' #'market1501' # sign one_video_test
 dataset_type = 'video_test' #'video_test
 resized_dirname = 'resized768_img'
 dataset_dir = os.path.join(root_dir, dataset)

@@ -72,7 +72,7 @@ def run_preprcessing_sign(kpt_txts):
     param['anno_height'] = 512
     PK = ProcessingSignKeypoints()
     for i in tqdm.tqdm(range(len(kpt_txts))):
-        pose_image_path = kpt_txts[i].replace('pose', 'pose_c_img').replace('.txt', '.jpg')
+        pose_image_path = kpt_txts[i].replace('pose', 'pose_img').replace('.txt', '.jpg')
         img_path = kpt_txts[i].replace('/pose/', '/img/').replace('txt', 'jpg')
         img = cv2.imread(img_path)
         # h, w, c = img.shape
@@ -84,7 +84,7 @@ def run_preprcessing_sign(kpt_txts):
 
 root_dir = 'dataset'
 dataname = 'sign' #; 'market1501' deepfashion
-dataset_type = 'train'
+dataset_type = 'video'
 
 if dataname == 'deepfashion':
     save_dir = 'pose_img'
