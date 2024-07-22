@@ -48,22 +48,70 @@ gt_list = np.array(gt_list)
 
 
 # ## A1
-generate_path = './dataset/deepfashion/generate'
-distorated_list = glob.glob(f'{generate_path}/**/*.png', recursive=True)
-# np.random.shuffle(distorated_list)
-# len(distorated_list)
+generate_dname = 'generate_ab2_15_jpg'
+generate_path = f'./dataset/deepfashion/{generate_dname}'
+distorated_list = glob.glob(f'{generate_path}/**/*.jpg', recursive=True)
+
+# generate_save_path = f'./dataset/deepfashion/generate_ab2_15_jpg'
+# os.mkdir(generate_save_path)
+# for i in range(len(distorated_list)):
+#     path = distorated_list[i]
+#     aa = plt.imread(path)
+#     plt.imsave(path.replace('.png','.jpg').replace('generate_ab2_15', 'generate_ab2_15_jpg'), aa)
+np.random.shuffle(distorated_list)
+len(distorated_list)
 # distorated_list = [i.replace('generate', 'generate_ab2') for i in distorated_list]
 # real_path = ['_'.join(i.split('_')[:-1]).replace('generate_ab2', 'original_img') + '.jpg' for i in distorated_list]
-real_path = ['_'.join(i.split('_')[:-1]).replace('generate', 'original_img') + '.jpg' for i in distorated_list]
-# gt_path = './dataset/deepfashion/resized512_img'
+# real_path = ['_'.join(i.split('_')[:-1]).replace(generate_dname, 'original_img') + '.jpg' for i in distorated_list]
+# real_unique_path = np.unique(real_path)
+# gt_train_list = gt_list[~np.isin(gt_list, real_unique_path)]
+# uniq_list = np.unique(np.array([''.join(i.split('/')[4:7]) for i in gt_train_list]))
+# aa = np.array([''.join(i.split('/')[4:7]) for i in distorated_list])
+# distorated_list = np.array(distorated_list)[~np.isin(aa, uniq_list)]
+# distorated_list = distorated_list.tolist()
+# real_path = ['_'.join(i.split('_')[:-1]).replace(generate_dname, 'original_img') + '.jpg' for i in distorated_list]
+
+
+# ## A2
+# generate_dname = 'generate_ab2_20'
+# generate_path = f'./dataset/deepfashion/{generate_dname}'
+# distorated_list = glob.glob(f'{generate_path}/**/*.png', recursive=True)
+#
+# # distorated_list = [i.replace('generate_ab3_20', 'generate_ab2_20') for i in distorated_list]
+#
+# path_dict = {}
+# gt_path = './dataset/deepfashion/original_img'  # original_img resized512_img
 # gt_list = glob.glob(f'{gt_path}/**/*.jpg', recursive=True)
-real_unique_path = np.unique(real_path)
-gt_train_list = gt_list[~np.isin(gt_list, real_unique_path)]
+# for i in range(len(gt_list)):
+#     _id = gt_list[i].replace('./dataset/deepfashion/original_img', '').replace('id_', 'id').replace('/','').replace('_','') # + '.jpg'
+#     path_dict[_id] = gt_list[i]
+# real_path = []
+# for i in range(len(distorated_list)):
+#     ii = distorated_list[i].split('.jpg_2_')[-1].replace('_vis', '').replace('_', '').replace('.png', '')
+#     real_path.append(path_dict[ii])
+#
+# real_unique_path = np.unique(real_path)
+# gt_path_list = np.array(glob.glob(f'{gt_path}/**/*.jpg', recursive=True))
+# gt_train_list = gt_path_list[~np.isin(gt_path_list, real_unique_path)]
 
+######### A3
+generate_dname = 'generate_512_PCDM'
+generate_path = f'./dataset/deepfashion/{generate_dname}'
+distorated_list = glob.glob(f'{generate_path}/**/*.png', recursive=True)
 
+# distorated_list = [i.replace('generate_ab3_20', 'generate_ab1_20') for i in distorated_list]
 
+path_dict = {}
+gt_path = './dataset/deepfashion/original_img'  # original_img resized512_img
+gt_list = glob.glob(f'{gt_path}/**/*.jpg', recursive=True)
+for i in range(len(gt_list)):
+    _id = gt_list[i].replace('./dataset/deepfashion/original_img', '').replace('id_', 'id').replace('/','').replace('_','') # + '.jpg'
+    path_dict[_id] = gt_list[i]
+real_path = []
+for i in range(len(distorated_list)):
+    ii = distorated_list[i].split('_to_')[-1].replace('_', '').replace('.png', '.jpg')
+    real_path.append(path_dict[ii])
 
-######### A2
 # gt_path = './dataset/deepfashion/generate_CFLD'
 # distorated_list = glob.glob(f'{gt_path}/**/*.png', recursive=True)
 # np.random.shuffle(distorated_list)
@@ -79,31 +127,57 @@ gt_train_list = gt_list[~np.isin(gt_list, real_unique_path)]
 # for i in range(len(distorated_list)):
 #     ii = distorated_list[i].split('_2_')[-1].replace('_vis', '').replace('_', '').replace('.png','.jpg')
 #     real_path.append(path_dict[ii])
-# real_train_path = []
 
 
+real_unique_path = np.unique(real_path)
+gt_path_list = np.array(glob.glob(f'{gt_path}/**/*.jpg', recursive=True))
+gt_train_list = gt_path_list[np.isin(gt_path_list, real_unique_path)]
+gt_train_list = np.unique(gt_train_list)
+# import json
+# if isinstance('./dataset/deepfashion/train_pairs_data.json' , str):
+#     data = json.load(open('./dataset/deepfashion/train_pairs_data.json' ))
+#
+# gt_path_list = []
+# for i in data:
+#     gt_path_list.append(i['target_image'].replace('./img', './dataset/deepfashion/original_img'))
+# gt_train_list = gt_path_list # np.unique(gt_path_list)
 
-_img_size = (176, 256)
+
+# real_path = []
+# uniq_list = np.unique(np.array([''.join(i.split('/')[4:7]).replace('_','') for i in gt_train_list]))
+# aa = np.array([''.join(''.join(i.split('_2_')[-1].split('_')[:1]).replace('fashion','')) for i in distorated_list])
+# distorated_list = np.array(distorated_list)[~np.isin(aa, uniq_list)]
+# distorated_list = distorated_list.tolist()
+# for i in range(len(distorated_list)):
+#     ii = distorated_list[i].split('_2_')[-1].replace('_vis', '').replace('_', '').replace('.png','.jpg')
+#     real_path.append(path_dict[ii])
+
+
+gt_path_list = np.array(glob.glob(f'{gt_path}/**/*.jpg', recursive=True))
+gt_train_list = gt_path_list[np.isin(gt_path_list, real_path)]
+len(gt_train_list)
+
+_img_size = (352, 512)  #(176, 256) # (352, 512) # (176, 256) # (352, 512) # (176, 256)
 
 
 fid_pred_data = FidRealDeepFashion(distorated_list, _img_size[::-1])
 fid_pred_loader = DataLoader(
     fid_pred_data,
-    batch_size=256,
+    batch_size=64,
     num_workers=6,
     pin_memory=True
 )
 fid_real_data = FidRealDeepFashion(gt_train_list, _img_size[::-1])
 fid_real_loader = DataLoader(
     fid_real_data,
-    batch_size=256,
+    batch_size=64,
     num_workers=6,
     pin_memory=True
 )
 
 
  # (352, 512) #(176, 256) (352, 512)
-
+len(distorated_list)
 fid_val = fid.calculate_batch(fid_pred_loader, fid_real_loader) # (176, 256) (352, 512)
 lpips_val = lpips_obj.calculate_from_disk(distorated_list, real_path, img_size=_img_size, sort=False)
 REC = rec.calculate_from_disk(distorated_list, real_path, None,  img_size=_img_size, sort=False, debug=False)
@@ -115,32 +189,32 @@ ssim_256 = round(REC['ssim_256'][0],4)
 psnr = round(REC['psnr'][0], 4)
 print(f"FID:{fid_val}, LPIPS:{lpips_val}, ssim:{ssim}, ssim-256:{ssim_256}, psnr:{psnr}")
 
+# PCDMs
+# SOTA FID:0, LPIPS:0.1572, ssim:0.7179, ssim-256:0.728, psnr:18.3854 (test : 5.900)
+# SOTA FID:5.53, LPIPS:0.1729, ssim:0.7003, ssim-256:0.7471, psnr:18.0279 (test: 5.53)
 
-# FID:0, LPIPS:0.1418, ssim:0.7304, ssim-256:0.7383, psnr:18.4333
-# FID:0, LPIPS:0.1436, ssim:0.734, ssim-256:0.7426, psnr:18.5407
+# CFLD
+# SOTA FID:6.804 (7.048418), LPIPS:0.1519, ssim:0.7378, psnr:18.235 (test : fid_distance 5.688355)
+# SOTA FID:7.149 , LPIPS:0.1819, ssim:0.7478, psnr:17.645
 
-# 'fid': 58.43184508976461, 'lpips': 0.2103121280670166, 'ssim': 0.6950225738815003, 'psnr': 16.78713112345808,
-# FID:10.259, LPIPS:0.176, ssim:0.72, psnr:17.188
-# FID:9.444, LPIPS:0.165, ssim:0.725, psnr:17.398
-# FID:9.35, LPIPS:0.154, ssim:0.733, psnr:17.844xqx
-# FID:0, LPIPS:0, ssim:0.731, psnr:18.022
-# 9.479875 LPIPS:0.174, ssim:0.733, psnr:18.12
-# SOTA FID:6.804, LPIPS:0.1519, ssim:0.7378, psnr:18.235
-# SOTA FID:5.7377, LPIPS:0.1519, ssim:0.7291, ssim-256:0.7378, psnr:18.2389
+# ablation 1 src
+# FID:7.627502, LPIPS:0.1472, ssim:0.734, ssim-256:0.7381, psnr:18.6994
+# FID:7.8832, LPIPS:0.1744, ssim:0.7038, ssim-256:0.7464, psnr:18.081
 
 # ablation 2 src + kpt
-# FID:5.902414, LPIPS:0.1471, ssim:0.7352, ssim-256:0.7386, psnr:18.69
-# FID:6.341941, LPIPS:0.1741, ssim:0.7049, ssim-256:0.747, psnr:18.073
+# FID:7.630600, LPIPS:0.147, ssim:0.7352, ssim-256:0.7386, psnr:18.69 (test : fid 5.481010)
+# FID:7.924412, LPIPS:0.174, ssim:0.7049, ssim-256:0.747, psnr:18.073
 
+# // uniq : FID:0, LPIPS:0.1608, ssim:0.704, ssim-256:0.7252, psnr:18.0392
 
 # ablation 3 src + kpt + global
-# FID:0, LPIPS:0.1483, ssim:0.7357, ssim-256:0.7385, psnr:18.7313 -ep 60
-
-
+# old FID:0, LPIPS:0.1483, ssim:0.7357, ssim-256:0.7385, psnr:18.7313 -ep 60
+# FID: 7.237894, LPIPS:0.1457, ssim:0.7369, ssim-256:0.7387, psnr:18.7497 (test : fid 5.490529)
+# FID:7.4791, LPIPS:0.1729, ssim:0.7053, ssim-256:0.7466, psnr:18.1237
 
 # ablation 4 src + kpt + global + patch
 # FID:0, LPIPS:0.1502, ssim:0.7272, ssim-256:0.7355, psnr:18.3332 Epoch-60 (FID:0, LPIPS:0.1289, ssim:0.7277, ssim-256:0.7475, psnr:18.3396
 # FID:5.447280, LPIPS:0.1506, ssim:0.7246, ssim-256:0.7304, psnr:18.4066 ablation 4 final
 
-
+# ablation 5 src  + global
 

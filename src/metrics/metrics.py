@@ -1,11 +1,5 @@
 import glob
 import os
-import pathlib
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torchvision import models
 
 import lpips
 # import argparse
@@ -13,15 +7,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import skimage
 import torch
-from imageio import imread
-import pickle
+from PIL import Image
 from scipy import linalg
 from skimage.metrics import peak_signal_noise_ratio as compare_psnr
 from skimage.metrics import structural_similarity as compare_ssim
-from torch.nn.functional import adaptive_avg_pool2d
-from PIL import Image
-from src.metrics.inception import InceptionV3
 
+from src.metrics.inception import InceptionV3
 
 print(skimage.__version__)
 
@@ -69,34 +60,43 @@ class FID():
 
         self.model.eval()
 
+    def __call__(self, images, gt_images):
+        """ images:  list of the generated image. The values must lie between 0 and 1.
+            gt_path: the path of the ground truth images.  The values must lie between 0 and 1.
+        """
+        # if not os.path.exists(gt_path):
+        #     raise RuntimeError('Invalid path: %s' % gt_path)
 
-
-    def calculate_batch(self, fid_pred_data, fid_real_data):
-        print('calculate gt statistics...')
-        m1, s1 = self.compute_statistics_of_loader(fid_real_data, self.verbose, type='gt')
-        print('calculate pred statistics...')
-        m2, s2 = self.compute_statistics_of_loader(fid_pred_data, self.verbose, type='gt')
+        print('calculate gt_path statistics...')
+        m1, s1 = self.calculate_activation_statistics(gt_images, self.verbose)
+        print('calculate generated_images statistics...')
+        m2, s2 = self.calculate_activation_statistics(images, self.verbose)
         fid_value = self.calculate_frechet_distance(m1, s1, m2, s2)
-        print('fid_distance %f' % (fid_value))
         return fid_value
 
-
-
-    def compute_statistics_of_loader(self, fid_data, verbose, type='gt'):
-        for i, fid_imgs in enumerate(fid_data):
-            if self.cuda:
-                fid_imgs = fid_imgs.cuda()
-            act = self.get_activations(fid_imgs, verbose)
-            if i == 0:
-                out_gathered = act.cpu().numpy()
-            else:
-                out_gathered = np.concatenate((out_gathered, act.cpu().numpy()))
-
-        out_gathered = out_gathered.reshape(out_gathered.shape[0], -1)
-        mu = np.mean(out_gathered, axis=0)
-        sigma = np.cov(out_gathered, rowvar=False)
+    def calculate_activation_statistics(self, images, verbose):
+        """Calculation of the statistics used by the FID.
+        Params:
+        -- images      : Numpy array of dimension (n_images, 3, hi, wi). The values
+                         must lie between 0 and 1.
+        -- model       : Instance of inception model
+        -- batch_size  : The images numpy array is split into batches with
+                         batch size batch_size. A reasonable batch size
+                         depends on the hardware.
+        -- dims        : Dimensionality of features returned by Inception
+        -- cuda        : If set to True, use GPU
+        -- verbose     : If set to True and parameter out_step is given, the
+                         number of calculated batches is reported.
+        Returns:
+        -- mu    : The mean over samples of the activations of the pool_3 layer of
+                   the inception model.
+        -- sigma : The covariance matrix of the activations of the pool_3 layer of
+                   the inception model.
+        """
+        act = self.get_activations(images, verbose)
+        mu = np.mean(act, axis=0)
+        sigma = np.cov(act, rowvar=False)
         return mu, sigma
-
 
 
     def get_activations(self, images, verbose=False):
@@ -118,45 +118,65 @@ class FID():
            query tensor.
         """
         self.model.eval()
-        # self.inception_blocks.eval()
+
+        d0 = images.shape[0]
+        if self.batch_size > d0:
+            print(('Warning: batch size is bigger than the data size. '
+                   'Setting batch size to data size'))
+            self.batch_size = d0
+
+        n_batches = d0 // self.batch_size
+        n_used_imgs = n_batches * self.batch_size
+
+        pred_arr = np.empty((n_used_imgs, self.dims))
+        for i in range(n_batches):
+            if verbose:
+                print('\rPropagating batch %d/%d' % (i + 1, n_batches))
+                # end='', flush=True)
+            start = i * self.batch_size
+            end = start + self.batch_size
+
+            batch = torch.from_numpy(images[start:end]).type(torch.FloatTensor)
+            # batch = Variable(batch, volatile=True)
+            if self.cuda:
+                batch = batch.cuda()
+
+            pred = self.model(batch)[0].reshape(self.batch_size, -1)
+            pred_arr[start:end] = pred.cpu().data.numpy()  # .reshape(self.batch_size, -1)
+
+        if verbose:
+            print(' done')
+
+        return pred_arr
+
+    def calculate_batch(self, fid_pred_data, fid_real_data):
+        print('calculate gt statistics...')
+        m1, s1 = self.compute_statistics_of_loader(fid_real_data, self.verbose, type='gt')
+        print('calculate pred statistics...')
+        m2, s2 = self.compute_statistics_of_loader(fid_pred_data, self.verbose, type='gt')
+        fid_value = self.calculate_frechet_distance(m1, s1, m2, s2)
+        print('fid_distance %f' % (fid_value))
+        return fid_value
+
+    def compute_statistics_of_loader(self, fid_data, verbose, type='gt'):
+        for i, fid_imgs in enumerate(fid_data):
+            if self.cuda:
+                fid_imgs = fid_imgs.cuda()
+            act = self.get_tensor_activations(fid_imgs, verbose)
+            if i == 0:
+                out_gathered = act.cpu().numpy()
+            else:
+                out_gathered = np.concatenate((out_gathered, act.cpu().numpy()))
+
+        out_gathered = out_gathered.reshape(out_gathered.shape[0], -1)
+        mu = np.mean(out_gathered, axis=0)
+        sigma = np.cov(out_gathered, rowvar=False)
+        return mu, sigma
+
+    def get_tensor_activations(self, images, verbose=False):
+        self.model.eval()
         pred = self.model(images)[0]
         return pred
-        # d0 = images.shape[0]
-        # if self.batch_size > d0:
-        #     print(('Warning: batch size is bigger than the data size. '
-        #            'Setting batch size to data size'))
-        #     self.batch_size = d0
-        #
-        # n_batches = d0 // self.batch_size
-        # n_used_imgs = n_batches * self.batch_size
-        #
-        # pred_arr = np.empty((n_used_imgs, self.dims))
-        # for i in range(n_batches):
-        #     if verbose:
-        #         print('\rPropagating batch %d/%d' % (i + 1, n_batches))
-        #         # end='', flush=True)
-        #     start = i * self.batch_size
-        #     end = start + self.batch_size
-        #
-        #     batch = torch.from_numpy(images[start:end]).type(torch.FloatTensor)
-        #     # batch = Variable(batch, volatile=True)
-        #     if self.cuda:
-        #         batch = batch.cuda()
-        #     pred = self.model(batch)[0]
-        #
-        #     # pred = self.forward_inception(batch).reshape(self.batch_size, -1)
-        #
-        #     # If model output is not scalar, apply global spatial average pooling.
-        #     # This happens if you choose a dimensionality not equal 2048.
-        #     if pred.shape[2] != 1 or pred.shape[3] != 1:
-        #         pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
-        #
-        #     pred_arr[start:end] = pred.cpu().data.numpy().reshape(self.batch_size, -1)
-        #
-        # if verbose:
-        #     print(' done')
-        #
-        # return pred_arr
 
     def calculate_frechet_distance(self, mu1, sigma1, mu2, sigma2, eps=1e-6):
         """Numpy implementation of the Frechet Distance.
@@ -265,29 +285,6 @@ class FID():
     #                 pickle.dump([m, s], f)
     #     return m, s
     #
-    # def calculate_activation_statistics(self, images, verbose):
-    #     """Calculation of the statistics used by the FID.
-    #     Params:
-    #     -- images      : Numpy array of dimension (n_images, 3, hi, wi). The values
-    #                      must lie between 0 and 1.
-    #     -- model       : Instance of inception model
-    #     -- batch_size  : The images numpy array is split into batches with
-    #                      batch size batch_size. A reasonable batch size
-    #                      depends on the hardware.
-    #     -- dims        : Dimensionality of features returned by Inception
-    #     -- cuda        : If set to True, use GPU
-    #     -- verbose     : If set to True and parameter out_step is given, the
-    #                      number of calculated batches is reported.
-    #     Returns:
-    #     -- mu    : The mean over samples of the activations of the pool_3 layer of
-    #                the inception model.
-    #     -- sigma : The covariance matrix of the activations of the pool_3 layer of
-    #                the inception model.
-    #     """
-    #     act = self.get_activations(images, verbose)
-    #     mu = np.mean(act, axis=0)
-    #     sigma = np.cov(act, rowvar=False)
-    #     return mu, sigma
 
 class Reconstruction_Metrics():
     def __init__(self, metric_list=['ssim', 'psnr', 'l1', 'mae'], data_range=1, win_size=51, multichannel=True):
@@ -379,7 +376,7 @@ class Reconstruction_Metrics():
 
             img_gt_256 = img_gt * 255.0
             img_pred_256 = img_pred * 255.0
-            ssim_256.append(compare_ssim(img_gt_256, img_pred_256, gaussian_weights=True, sigma=1.2,
+            ssim_256.append(compare_ssim(img_gt_256, img_pred_256, gaussian_weights=True, sigma=1.5,
                                          use_sample_covariance=False, channel_axis=2, multichannel=True,
                                          data_range=img_pred_256.max() - img_pred_256.min()))
             if np.mod(index, 200) == 0:
@@ -530,7 +527,7 @@ class LPIPS():
                 img_2_batch = img_2_batch.cuda()
 
                 with torch.no_grad():
-                    result = self.model.forward(img_1_batch, img_2_batch, normalize=False)
+                    result = self.model.forward(img_1_batch, img_2_batch, normalize=True)
 
             results.append(result)
 

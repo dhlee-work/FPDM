@@ -429,7 +429,9 @@ class FPDM_DiffusionPipeline(DiffusionPipeline):
         # target feature
         # prior_embed = pred_t_img_embed.repeat(bs * num_images_per_prompt, 1, 1).to(device=device) #, dtype=torch.float16
         if fusion_img_embed is not None:
-            prior_embed = fusion_img_embed.repeat(bs * num_images_per_prompt, 1, 1).to(device=device)  # , dtype=torch.float16
+            # prior_embed = fusion_img_embed.repeat(bs * num_images_per_prompt, 1, 1).to(device=device)
+            prior_embed = fusion_img_embed.repeat(1 * num_images_per_prompt, 1, 1).to(device=device)
+            # , dtype=torch.float16
         else:
             prior_embed = None
 

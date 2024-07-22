@@ -27,7 +27,7 @@ def str2bool(v):
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default='./config/c1.fpdm-clip-deepfashion-test.yaml', help='Path to config file')
+    parser.add_argument("--config", type=str, default='./config/c1.fpdm-clip-market1501-test.yaml', help='Path to config file')
     return parser.parse_args()
 
 
@@ -73,7 +73,7 @@ traindataset = FPDM_Dataset(
     config.data_root_path,
     phase='train',
     model_img_size=config.model_img_size,
-    img_size=config.img_size,
+    read_pose_img=config.read_pose_img,
     src_encoder_path=config.src_encoder_path,
     src_encoder_size=config.src_encoder_size,
     fusion_encoder_path=config.fusion_encoder_path,
@@ -94,7 +94,7 @@ testdataset = FPDM_Dataset(
     config.data_root_path,
     phase='test',
     model_img_size=config.model_img_size,
-    img_size=config.img_size,  # w h
+    read_pose_img=config.read_pose_img,
     src_encoder_path=config.src_encoder_path,
     src_encoder_size=config.src_encoder_size,
     fusion_encoder_path=config.fusion_encoder_path,

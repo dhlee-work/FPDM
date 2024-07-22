@@ -43,8 +43,8 @@ class FPDM_Dataset(Dataset):
             phase='train',
             src_encoder_path=None,
             fusion_encoder_path=None,
+            read_pose_img=False,
             model_img_size=(512, 512),
-            img_size=(512, 512),
             src_encoder_size=(512,512),
             imgs_drop_rate=0.0,
             pose_drop_rate=0.0,
@@ -57,7 +57,7 @@ class FPDM_Dataset(Dataset):
         self.image_root_path = image_root_path
         self.src_encoder_size = src_encoder_size
         self.phase = phase
-        self.img_size = img_size
+        self.read_pose_img = read_pose_img
         self.model_img_size = model_img_size
         self.imgs_drop_rate = imgs_drop_rate
         self.pose_drop_rate = pose_drop_rate
@@ -95,9 +95,6 @@ class FPDM_Dataset(Dataset):
         self.PK = ProcessingKeypoints()
 
     def transforms(self, source_img, target_img, s_keypoint, t_keypoint):
-        # Random crop
-        # t_keypoint
-        # t_keypoint2 = t_keypoint.copy()
         pose_size = [375, 550]
         # s_pose = self.PK.draw_img(s_keypoint, [pose_size[1], pose_size[0]], self.kpt_param)
         if random.random() < 1.0:
@@ -158,23 +155,25 @@ class FPDM_Dataset(Dataset):
         t_img = Image.open(t_img_path)# .resize(self.img_size, Image.BICUBIC)
         t_img = t_img.resize(self.model_img_size, Image.BICUBIC)
 
+        if self.read_pose_img:
+            t_pose = Image.open(t_img_path.replace("/img/", "/pose_img/")).convert("RGB")
+            t_pose = t_pose.resize(self.model_img_size, Image.BICUBIC)
+            s_pose = Image.open(s_img_path.replace("/img/", "/pose_img/")).convert("RGB")
 
-        # t_pose = Image.open(t_img_path.replace("/img/", "/pose_img/"))#.resize(self.img_size, Image.BICUBIC)
-        # t_pose = t_pose.resize(self.model_img_size, Image.BICUBIC)
-
-        t_pose_path = t_img_path.replace('img', 'pose').replace('.jpg', '.txt')
-        t_keypoint = np.loadtxt(t_pose_path)
-        t_keypoint = self.PK.trans_keypoins(t_keypoint, [550, 375], self.kpt_param)
-
-        s_pose_path = s_img_path.replace('img', 'pose').replace('.jpg', '.txt')
-        s_keypoint = np.loadtxt(s_pose_path)
-        s_keypoint = self.PK.trans_keypoins(s_keypoint, [550, 375], self.kpt_param)
-        # s_img, t_img, s_pose, t_pose = self.transforms(s_img, t_img, s_keypoint, t_keypoint)
-        if self.phase == 'train':
-            s_img, t_img, s_pose, t_pose = self.transforms(s_img, t_img, s_keypoint, t_keypoint)
         else:
-            t_pose = self.PK.draw_img(t_keypoint, [550, 375], self.kpt_param)
-            s_pose = self.PK.draw_img(s_keypoint, [550, 375], self.kpt_param)
+            t_pose_path = t_img_path.replace('img', 'pose').replace('.jpg', '.txt')
+            t_keypoint = np.loadtxt(t_pose_path)
+            t_keypoint = self.PK.trans_keypoins(t_keypoint, [550, 375], self.kpt_param)
+
+            s_pose_path = s_img_path.replace('img', 'pose').replace('.jpg', '.txt')
+            s_keypoint = np.loadtxt(s_pose_path)
+            s_keypoint = self.PK.trans_keypoins(s_keypoint, [550, 375], self.kpt_param)
+            # s_img, t_img, s_pose, t_pose = self.transforms(s_img, t_img, s_keypoint, t_keypoint)
+            if self.phase == 'train':
+                s_img, t_img, s_pose, t_pose = self.transforms(s_img, t_img, s_keypoint, t_keypoint)
+            else:
+                t_pose = self.PK.draw_img(t_keypoint, [550, 375], self.kpt_param)
+                s_pose = self.PK.draw_img(s_keypoint, [550, 375], self.kpt_param)
 
         trans_t_img = self.transform_normalize(self.transform_totensor(t_img))
         trans_t_pose = self.transform_totensor(t_pose.resize(self.model_img_size, Image.BICUBIC))
