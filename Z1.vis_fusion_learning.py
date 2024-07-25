@@ -33,48 +33,6 @@ def read_dataset(root_path, filename):
         data = json.load(f)
     return data
 
-from transformers import AutoImageProcessor, AutoModel
-from PIL import Image
-import requests
-#
-# url = 'http://images.cocodataset.org/val2017/000000039769.jpg'
-# image = Image.open(requests.get(url, stream=True).raw)
-#
-# processor = AutoImageProcessor.from_pretrained('facebook/dinov2-base')
-# model = AutoModel.from_pretrained('facebook/dinov2-base')
-#
-# inputs = processor(images=image, return_tensors="pt")
-# inputs['pixel_values'] = torch.zeros_like(inputs['pixel_values'])
-# outputs = model(**inputs)
-# last_hidden_states = outputs.last_hidden_state
-
-#
-#
-# def cosinesim(dat0, dat1):
-#     cos_list = []
-#     for i in range(len(dat0)):
-#         cos_list.append(1 - scipy.spatial.distance.cosine(dat0[i], dat1[i]))
-#     return cos_list
-
-'''
-contrastive learning
-1. vit output of pidm
-2. vit of clip4cir
-3. vir out of classification
-'''
-# import glob
-# img_list = glob.glob('./dataset/deepfashion/img/**/*.jpg', recursive=True)
-# img = plt.imread(img_list[3])
-# plt.imshow(img[40:54,190:204,:]);plt.show()
-
-# x = np.linspace(-0.5, 0.5, 100)
-# y = 1 / (1 + np.exp(50 * (0.01 - x)))
-# plt.plot(x, y, color='blue')
-# plt.vlines(0.1, 0, 1, color='black')
-# plt.grid()
-# plt.show()
-
-
 def get_parser():
     def str2bool(v):
         if isinstance(v, bool):
@@ -264,6 +222,23 @@ bb = np.array(cosinesim(t_pose_features, t_img_features))
 cc = np.array(cosinesim(fusion_features, t_img_features))
 xx = np.linspace(0, 1, 100)
 
+
+from scipy.spatial.distance import cdist
+
+
+aaa = np.expand_dims(fusion_features[:10], axis=1)
+bbb = np.expand_dims(t_img_features[:100], axis=0)
+
+ccc = 1 - cdist(fusion_features[:10], t_img_features[:], metric='cosine')
+
+ccc.shape
+
+ccc.argmax(0)
+
+
+
+
+
 plt.scatter(aa, cc, alpha=0.1, c='orange')
 # plt.scatter(cc, bb, alpha=0.4, c='blue')
 plt.plot(xx, xx, '-', label='x=y', c='black')
@@ -281,8 +256,11 @@ np.mean(aa)
 np.mean(bb)
 np.mean(cc)
 np.mean(dd)
-#
-#
+
+
+
+
+
 
 aa = np.array(cosinesim(s_img_p_features, t_img_p_features))
 bb = np.array(cosinesim(t_pose_p_features, t_img_p_features))

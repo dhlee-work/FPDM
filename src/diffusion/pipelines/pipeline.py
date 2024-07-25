@@ -427,9 +427,7 @@ class FPDM_DiffusionPipeline(DiffusionPipeline):
         # feature_f = feature_f.repeat(bs * num_images_per_prompt, 1, 1).to(device=device)  # dtype=torch.float16,
         feature_f = feature_f.repeat(1 * num_images_per_prompt, 1, 1).to(device=device)  #
         # target feature
-        # prior_embed = pred_t_img_embed.repeat(bs * num_images_per_prompt, 1, 1).to(device=device) #, dtype=torch.float16
         if fusion_img_embed is not None:
-            # prior_embed = fusion_img_embed.repeat(bs * num_images_per_prompt, 1, 1).to(device=device)
             prior_embed = fusion_img_embed.repeat(1 * num_images_per_prompt, 1, 1).to(device=device)
             # , dtype=torch.float16
         else:
@@ -448,7 +446,7 @@ class FPDM_DiffusionPipeline(DiffusionPipeline):
                 prior_embed = torch.cat([neg_prior_embed, prior_embed], dim=0)
 
         else:
-            feature_f = feature_f.repeat(bs * num_images_per_prompt, 1, 1)
+            feature_f = feature_f.repeat(1 * num_images_per_prompt, 1, 1)
             # prior_embed = fusion_img_embed.repeat(bs * num_images_per_prompt, 1, 1).to(device=device)
 
         # 4. Prepare timesteps

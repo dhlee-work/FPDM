@@ -141,7 +141,7 @@ class FID():
             if self.cuda:
                 batch = batch.cuda()
 
-            pred = self.model(batch)[0].reshape(self.batch_size, -1)
+            pred = self.model(batch).reshape(self.batch_size, -1)
             pred_arr[start:end] = pred.cpu().data.numpy()  # .reshape(self.batch_size, -1)
 
         if verbose:

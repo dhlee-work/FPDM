@@ -522,8 +522,8 @@ class FPDM(pl.LightningModule):
                 s_image_embeddings = embddings_src.pooler_output
                 t_pose_embeddings = embddings_t_pos.pooler_output
 
-            cond_fusion_image_feature = self.fusion_model.combiner(s_image_embeddings,
-                                                                   t_pose_embeddings).unsqueeze(1)
+                cond_fusion_image_feature = self.fusion_model.combiner(s_image_embeddings,
+                                                                       t_pose_embeddings).unsqueeze(1)
         else:
             cond_fusion_image_feature = None
         # patch embeddings
@@ -578,90 +578,6 @@ class FPDM(pl.LightningModule):
         # output.images = [output.images[_arg_idx]]
 
         return output
-
-    def batch_denosing_pip(self, target_imgs, source_pose, target_pose,
-                     src_processed_source_image,
-                     fusion_processed_source_image,
-                     fusion_processed_target_pose):
-
-        generator = torch.Generator().manual_seed(self.hparams.seed_number)
-
-        cond_src_feature = self.src_image_encoder(src_processed_source_image)
-        s_image_patch_embeddings = (cond_src_feature.last_hidden_state) #[:, 1:, :]
-
-        # get fusion embeddings
-        embddings_src = self.fusion_model.img_encoder(fusion_processed_source_image)
-        embddings_t_pos = self.fusion_model.pose_encoder(fusion_processed_target_pose)
-        if self.hparams.fusion_encoder_type == 'clip':
-            s_image_embeddings = embddings_src.image_embeds
-            t_pose_embeddings = embddings_t_pos.image_embeds
-        else:
-            s_image_embeddings = embddings_src.pooler_output
-            t_pose_embeddings = embddings_t_pos.pooler_output
-
-        # image embeddings fusion
-        if self.hparams.fusion_image_encoder:
-            cond_fusion_image_feature = self.fusion_model.combiner(s_image_embeddings,
-                                                                   t_pose_embeddings).unsqueeze(1)
-        else:
-            cond_fusion_image_feature = None
-        # patch embeddings
-        #### src image patch embeddings
-        s_img_proj_f = self.sd_model.srcimage_proj_model(s_image_patch_embeddings)
-
-        if self.hparams.fusion_image_patch_encoder:
-            ##### pred target image patch embeddings fusion
-            kv_s_image_patch_embeddings = embddings_src.last_hidden_state[:, 1:, :]
-            q_t_pose_patch_embeddings = embddings_t_pos.last_hidden_state[:, 1:, :]
-            cond_attn_patch_embeddings = self.fusion_model.attention(q_t_pose_patch_embeddings,
-                                                                     kv_s_image_patch_embeddings,
-                                                                     kv_s_image_patch_embeddings)
-            cond_image_feature_f = self.sd_model.fusionpatch_proj_model(cond_attn_patch_embeddings)
-        else:
-            cond_image_feature_f = None
-
-        # pose image embedding
-        pose_t_cond = self.sd_model.pose_t_proj(target_pose)
-        if self.hparams.src_kpt_encoder:
-            pose_s_cond = self.sd_model.pose_s_proj(source_pose)
-            pose_s_cond = torch.flatten(pose_s_cond, 2, 3).transpose(1,2)
-            s_img_proj_f[:,1:,:] += pose_s_cond # 0th embedding is a global embeddi
-
-        # self.hparams.offset = 0.1
-        output = self.pipe(
-            height=self.hparams.model_img_size[1],
-            width=self.hparams.model_img_size[0],
-            guidance_rescale=0.0,
-            t_image=target_imgs,
-            s_img_proj_f=s_img_proj_f,
-            t_pose_f=pose_t_cond,
-            fusion_img_embed=cond_fusion_image_feature,
-            # pred_t_img_embed=cond_image_feature_f,
-            num_images_per_prompt= self.hparams.num_images_per_prompt,
-            guidance_scale=self.hparams.guidance_scale,
-            generator=generator,
-            num_inference_steps=self.hparams.num_inference_steps,
-            args=self.hparams
-        )
-        return output
-
-    def batch_image_generation(self, batch, mod):
-        out_dict = {}
-
-        source_pose = batch['source_pose'].cuda()
-        target_pose = batch['target_pose'].cuda()
-        target_imgs = batch['target_image'].cuda()
-        src_processed_source_image = batch['src_processed_source_image'].cuda()
-        fusion_processed_source_image = batch['fusion_processed_source_image'].cuda()
-        fusion_processed_target_pose = batch['fusion_processed_target_pose'].cuda()
-
-        outputs = self.batch_denosing_pip(target_imgs, source_pose, target_pose, src_processed_source_image,
-                                   fusion_processed_source_image, fusion_processed_target_pose)
-
-        for idx, output in enumerate(outputs.images):
-            out_dict[idx] = {}
-            out_dict[idx]['generate_images'] = [output] #.resize(self.hparams.img_size, Image.BICUBIC)
-        return out_dict
 
     def one_image_generation(self, s_img_path, t_img_path, s_pose_path, t_pose_path, mod):
         out_dict = {}
