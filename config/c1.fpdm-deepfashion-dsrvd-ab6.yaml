@@ -1,0 +1,64 @@
+project_name: 'diffusion-deepfashion-clipdino-st1ep5-b42-cum3-size352-kptaug-spose-ablation6'
+#root_path : './dataset/deepfashion/'
+disable_logger: False
+mode: 'client'
+port: 52162
+device: [0]
+batch_size: 1 # 42
+num_workers: 16
+lr: 0.0001
+accumulate_grad_batches: 3
+temperature: 0.07
+weight_decay: 0.0
+scheduler_t0: 100
+scheduler_t_mult: 2
+scheduler_eta_max: 0.0001 # 0.0001
+scheduler_t_up: 5
+scheduler_step_size: 50
+scheduler_gamma: 0.1
+max_epochs: 100
+data_root_path: './dataset/deepfashion_samples'
+train_json_path: './dataset/deepfashion_samples/train_pairs_data.json' # train_pairs_data
+test_json_path: './dataset/deepfashion_samples/test_pairs_data.json'
+phase : 'train'
+read_pose_img: false
+model_img_size : [352, 512]
+src_encoder_size: [512, 512]
+input_s_img_size: [512, 512]
+input_t_img_size: [352, 512]
+model_eval_img_size : [176, 256]
+guidance_scale: 2.0
+num_inference_steps: 20
+seed_number: 7
+num_images_per_prompt: 4
+test_n_samples: 5
+unet_conv_in_kenel: 3
+noise_offset: 0.1
+module_drop_rate: 0.2
+pose_erase_rate: 0.0 # bad deffect. delete
+pose_drop_rate: 0.2
+proj_drop_rate: 0.2
+embedded_drop_rate: 0.0 # bad deffect. delete
+src_encoder_path: 'facebook/dinov2-large' #'facebook/dinov2-base' # 'openai/clip-vit-base-patch16'
+src_encoder_type: 'dino' # 'clip', 'dino'
+fusion_encoder_path: 'openai/clip-vit-large-patch14' #'facebook/dinov2-base' # 'openai/clip-vit-base-patch16'
+fusion_encoder_type: 'clip' # 'clip', 'dino'
+init_src_image_encoder: true
+#src_kpt_encoder : false
+fusion_image_encoder: true
+#fusion_image_patch_encoder: false
+#proj_fusion_image_patch_encoder: false
+#fusion_patch_embed_ahead: false
+proj_embds_sum: null
+proj_embd_concat: false
+patch_proj_in_dim: 1024
+hidden_dim: 768
+class_embed_type : 'mlp'  # 'embd-from-mlp' # "projection"
+image_proj_in_dim : 768
+trained_model_name: null #
+logger_id: null
+pretrained_model_name_or_path: 'stabilityai/stable-diffusion-2-1'
+fusion_model_path: './logs/deepfashion-fusion-CLIP-b48-p005-r10-epoch5-lr1e-5-wd1e-4/model0/last.ckpt' # './logs/deepfashion-fusion-CLIP-b48-p005-r10-epoch3-lr1e-5-wd1e-4/2024-06-21T07-49-27/last.ckpt'
+visualize_images: true
+calculate_metrics: true
+loss_type: 'mse_loss'  # mse_loss, shrinkage_loss
