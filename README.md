@@ -137,6 +137,12 @@ python C2.eval.caculate_metrics.py
 
 ## D. Generated Results Examples
 ### 1. Generated Results on DeepFashion Dataset
+FPDM generates visually coherent and consistent images under variations in both pose and source appearance.
+It accurately preserves fine-grained clothing details and maintains their positional and shape consistency across 
+different target poses and source variations, outperforming other state-of-the-art methods that often suffer from 
+detail loss or inconsistency. Furthermore, FPDM demonstrates strong front-to-back visual continuity, indicating its 
+ability to preserve structural integrity and produce high-quality pose-conditioned images.
+
 All FPDM-generated images for the DeepFashion test set are available for download at the following link: 
 [Download generated results (Google Drive)](!https://drive.google.com/file/d/1jCKOwRxTsTVoD2veDbjjWgDsUK1TE3hW/view?usp=drive_link)
 ![Figure2](./fig/Figure2.jpg)  
