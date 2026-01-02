@@ -142,6 +142,13 @@ All FPDM-generated images for the DeepFashion test set are available for downloa
 ![Figure2](./fig/Figure2.jpg)  
 
 ### 2. Generated Results on Phoenix-2014-TG Dataset
+Overall, the model preserves the source appearance while generating signers according to pose 
+variations. However, when the pose quality is poor in certain frames, the quality of the generated 
+images also degrades accordingly. Since FPDM is an image-based generation model, temporal 
+inconsistencies and unnatural transitions between frames can be observed when the results are viewed 
+as a video. In future work, we plan to extend FPDM to a video generation model to alleviate these 
+limitations and improve overall video generation quality.
+
 All generated result images of FPDM on the Phoenix-2014-TG test dataset can be downloaded from the following link:
 [Download generated results (Google Drive)](!https://drive.google.com/file/d/1jCKOwRxTsTVoD2veDbjjWgDsUK1TE3hW/view?usp=drive_link)
 
