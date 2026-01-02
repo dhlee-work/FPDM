@@ -141,10 +141,6 @@ python C2.eval.caculate_metrics.py
 
 ### 2. Generated Results on Phoenix-2014-TG Dataset
 
-<video src="./fig/video_1.mp4" controls width="720"></video>
+![video_1](./fig/video_1.gif)
 
-<video src="./fig/video_2.mp4" controls width="720"></video>
-
-<video src="./fig/video_3.mp4" controls width="720"></video>
-
-[//]: # (<video src="./fig/video_4.mp4" controls width="720"></video>)
+![video_2](./fig/video_2.gif)
