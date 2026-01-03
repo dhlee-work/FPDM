@@ -1,43 +1,10 @@
 # FPDM
 
-## Abstract
-
-Pose-Guided Person Image Synthesis (PGPIS) aims to generate human images in specified poses 
-while preserving the identity and appearance of a source image. This technology facilitates 
-diverse applications, including e-commerce, digital avatars, and sign language generation. 
-Despite the high-quality results of recent diffusion-based PGPIS, these models typically 
-depend on implicit feature aggregation. This limits fine-grained texture preservation and
-robustness under pose variations. To address these limitations, we propose Fusion Embedding 
-for PGPIS using a Diffusion Model (FPDM), the first framework to explicitly align fused 
-source–pose embeddings with target image embeddings via contrastive learning.
-FPDM integrates an Image–Pose Fusion (IPF) module into our proposed Source-Enhanced Pose 
-Fusion approach to learn a fusion embedding aligned with the target image. We then employ 
-a conditional diffusion model guided by source appearance, target pose, and the learned
-fusion embedding. Experiments on the DeepFashion benchmark and RWTH-PHOENIX-Weather 2014T
-dataset demonstrate state-of-the-art performance in both quantitative and qualitative 
-evaluations, with ablation studies confirming that explicit fusion embedding alignment 
-substantially improves texture fidelity and pose-consistent synthesis. 
-
-![Figure1](./fig/Figure1.jpg)  
-
 
 ## Generated Results Examples
 ___
 
-### 1. Generated Results on DeepFashion Dataset
-FPDM generates visually coherent and consistent images under variations in both pose and source appearance.
-It accurately preserves fine-grained clothing details and maintains their positional and shape consistency across 
-different target poses and source variations, outperforming other state-of-the-art methods that often suffer from 
-detail loss or inconsistency. Furthermore, FPDM demonstrates strong front-to-back visual continuity, indicating its 
-ability to preserve structural integrity and produce high-quality pose-conditioned images.
-
-All FPDM-generated images for the DeepFashion test set are available for download at the following link: 
-[Resolution 512: Download results (Google Drive)](https://drive.google.com/file/d/18nxoIatPomHvVqk8KRXpGSpxAzDLV0HB/view?usp=sharing)
-[Resolution 256: Download results (Google Drive)](https://drive.google.com/file/d/1NoPnP1H8kTq2NX-uY51GvANQvG2-Y683/view?usp=sharing)
-
-![Figure2](./fig/Figure2.jpg)  
-
-### 2. Generated Results on Phoenix-2014-TG Dataset
+### 1. Generated Results on Phoenix-2014-TG Dataset
 Overall, the model preserves the source appearance while generating signers according to pose 
 variations. However, when the pose quality is poor in certain frames, the quality of the generated 
 images also degrades accordingly. Since FPDM is an image-based generation model, temporal 
@@ -58,6 +25,40 @@ limitations and improve overall video generation quality.
 
 All generated result images of FPDM on the Phoenix-2014-TG test dataset can be downloaded from the following link:
 [Download results (Google Drive)](https://drive.google.com/file/d/1L2mahCCh2FCjSKqp4JymH_oU8Tqysrq4/view?usp=sharing)
+
+### 2. Generated Results on DeepFashion Dataset
+FPDM generates visually coherent and consistent images under variations in both pose and source appearance.
+It accurately preserves fine-grained clothing details and maintains their positional and shape consistency across 
+different target poses and source variations, outperforming other state-of-the-art methods that often suffer from 
+detail loss or inconsistency. Furthermore, FPDM demonstrates strong front-to-back visual continuity, indicating its 
+ability to preserve structural integrity and produce high-quality pose-conditioned images.
+
+All FPDM-generated images for the DeepFashion test set are available for download at the following link: 
+[Resolution 512: Download results (Google Drive)](https://drive.google.com/file/d/18nxoIatPomHvVqk8KRXpGSpxAzDLV0HB/view?usp=sharing)
+[Resolution 256: Download results (Google Drive)](https://drive.google.com/file/d/1NoPnP1H8kTq2NX-uY51GvANQvG2-Y683/view?usp=sharing)
+
+![Figure2](./fig/Figure2.jpg)  
+
+
+## Abstract
+
+Pose-Guided Person Image Synthesis (PGPIS) aims to generate human images in specified poses 
+while preserving the identity and appearance of a source image. This technology facilitates 
+diverse applications, including e-commerce, digital avatars, and sign language generation. 
+Despite the high-quality results of recent diffusion-based PGPIS, these models typically 
+depend on implicit feature aggregation. This limits fine-grained texture preservation and
+robustness under pose variations. To address these limitations, we propose Fusion Embedding 
+for PGPIS using a Diffusion Model (FPDM), the first framework to explicitly align fused 
+source–pose embeddings with target image embeddings via contrastive learning.
+FPDM integrates an Image–Pose Fusion (IPF) module into our proposed Source-Enhanced Pose 
+Fusion approach to learn a fusion embedding aligned with the target image. We then employ 
+a conditional diffusion model guided by source appearance, target pose, and the learned
+fusion embedding. Experiments on the DeepFashion benchmark and RWTH-PHOENIX-Weather 2014T
+dataset demonstrate state-of-the-art performance in both quantitative and qualitative 
+evaluations, with ablation studies confirming that explicit fusion embedding alignment 
+substantially improves texture fidelity and pose-consistent synthesis. 
+
+![Figure1](./fig/Figure1.jpg)  
 
 
 ## A. Install Packages
