@@ -19,13 +19,54 @@ evaluations, with ablation studies confirming that explicit fusion embedding ali
 substantially improves texture fidelity and pose-consistent synthesis. 
 
 ![Figure1](./fig/Figure1.jpg)  
-## Install Packages
+
+
+## Generated Results Examples
+___
+
+### 1. Generated Results on DeepFashion Dataset
+FPDM generates visually coherent and consistent images under variations in both pose and source appearance.
+It accurately preserves fine-grained clothing details and maintains their positional and shape consistency across 
+different target poses and source variations, outperforming other state-of-the-art methods that often suffer from 
+detail loss or inconsistency. Furthermore, FPDM demonstrates strong front-to-back visual continuity, indicating its 
+ability to preserve structural integrity and produce high-quality pose-conditioned images.
+
+All FPDM-generated images for the DeepFashion test set are available for download at the following link: 
+[Resolution 512: Download results (Google Drive)](https://drive.google.com/file/d/18nxoIatPomHvVqk8KRXpGSpxAzDLV0HB/view?usp=sharing)
+[Resolution 256: Download results (Google Drive)](https://drive.google.com/file/d/1NoPnP1H8kTq2NX-uY51GvANQvG2-Y683/view?usp=sharing)
+
+![Figure2](./fig/Figure2.jpg)  
+
+### 2. Generated Results on Phoenix-2014-TG Dataset
+Overall, the model preserves the source appearance while generating signers according to pose 
+variations. However, when the pose quality is poor in certain frames, the quality of the generated 
+images also degrades accordingly. Since FPDM is an image-based generation model, temporal 
+inconsistencies and unnatural transitions between frames can be observed when the results are viewed 
+as a video. In future work, we plan to extend FPDM to a video generation model to alleviate these 
+limitations and improve overall video generation quality.
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Source
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Pose 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; GT 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ours 
+
+<img src="./fig/10December_2009_Thursday_heute_7944.gif" width="512"/><br>
+<img src="./fig/21November_2011_Monday_heute_5437.gif" width="512"/><br>
+<img src="./fig/24March_2011_Thursday_tagesschau_3938.gif" width="512"/><br>
+<img src="./fig/29November_2009_Sunday_tagesschau_7045.gif" width="512"/><br>
+<img src="./fig/25June_2010_Friday_tagesschau_3880.gif" width="512"/><br>
+
+All generated result images of FPDM on the Phoenix-2014-TG test dataset can be downloaded from the following link:
+[Download results (Google Drive)](https://drive.google.com/file/d/1L2mahCCh2FCjSKqp4JymH_oU8Tqysrq4/view?usp=sharing)
+
+
+## A. Install Packages
 
 ~~~
 pip install -r requirements.txt
 ~~~
 
-## A. Dataset Preparation
+## B. Dataset Preparation
 
 ---
 - Due to file size limitations, we sampled only 5 pairs from the DeepFashion dataset for both the training and test sets.
@@ -89,7 +130,7 @@ Below table is data structure for reproducing our model
 
 &nbsp;
 
-## B. Training Proposed Model
+## C. Training Proposed Model
 
 ___
 ### 1. Train Stage 1 Fusion Model
@@ -117,7 +158,7 @@ python B2.train_Diffusion_model.py
 
 &nbsp;
 
-## C. Test Proposed FPDM Model
+## D. Test Proposed FPDM Model
 ___
 ### 1. Synthesis Images From Test Dataset
 
@@ -136,42 +177,4 @@ Peak Signal-to-Noise Ratio (PSNR), Deep Feature-based Learned Perceptual Image P
 ~~~
 python C2.eval.caculate_metrics.py
 ~~~
-
-## D. Generated Results Examples
-___
-
-### 1. Generated Results on DeepFashion Dataset
-FPDM generates visually coherent and consistent images under variations in both pose and source appearance.
-It accurately preserves fine-grained clothing details and maintains their positional and shape consistency across 
-different target poses and source variations, outperforming other state-of-the-art methods that often suffer from 
-detail loss or inconsistency. Furthermore, FPDM demonstrates strong front-to-back visual continuity, indicating its 
-ability to preserve structural integrity and produce high-quality pose-conditioned images.
-
-All FPDM-generated images for the DeepFashion test set are available for download at the following link: 
-[Resolution 512: Download results (Google Drive)](https://drive.google.com/file/d/18nxoIatPomHvVqk8KRXpGSpxAzDLV0HB/view?usp=sharing)
-[Resolution 256: Download results (Google Drive)](https://drive.google.com/file/d/1NoPnP1H8kTq2NX-uY51GvANQvG2-Y683/view?usp=sharing)
-
-![Figure2](./fig/Figure2.jpg)  
-
-### 2. Generated Results on Phoenix-2014-TG Dataset
-Overall, the model preserves the source appearance while generating signers according to pose 
-variations. However, when the pose quality is poor in certain frames, the quality of the generated 
-images also degrades accordingly. Since FPDM is an image-based generation model, temporal 
-inconsistencies and unnatural transitions between frames can be observed when the results are viewed 
-as a video. In future work, we plan to extend FPDM to a video generation model to alleviate these 
-limitations and improve overall video generation quality.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Source
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Pose 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; GT 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ours 
-
-<img src="./fig/10December_2009_Thursday_heute_7944.gif" width="512"/><br>
-<img src="./fig/21November_2011_Monday_heute_5437.gif" width="512"/><br>
-<img src="./fig/24March_2011_Thursday_tagesschau_3938.gif" width="512"/><br>
-<img src="./fig/29November_2009_Sunday_tagesschau_7045.gif" width="512"/><br>
-<img src="./fig/25June_2010_Friday_tagesschau_3880.gif" width="512"/><br>
-
-All generated result images of FPDM on the Phoenix-2014-TG test dataset can be downloaded from the following link:
-[Download results (Google Drive)](https://drive.google.com/file/d/1L2mahCCh2FCjSKqp4JymH_oU8Tqysrq4/view?usp=sharing)
 
