@@ -96,19 +96,21 @@ ___
 To obtain the fusion embedding of image and pose, we trained our proposed model using CLIP-Large as the backbone 
 of the image encoder module and combiner as the fusion module.   
 - The CLIP pretrained model refers to
-[this model](!https://huggingface.co/openai/clip-vit-large-patch14) on Hugging Face.
-- The combiner module refers to [this model](https://github.com/ABaldrati/CLIP4Cir)
+[this model](https://huggingface.co/openai/clip-vit-large-patch14) on Hugging Face.
+
 ~~~
 python B1.train_Fusion_model.py
 ~~~
-
+We release the trained model at [this link](https://drive.google.com/file/d/10XuiPD2PdBu7kBUiUZRPFfLhUvspbCPa/view?usp=sharing)
 &nbsp;
 
 ### 2. Train Stage 2 Conditioned Diffusion Model
 
 We train the Stage 2 Conditioned Diffusion Model using the image-pose fusion embedding from the prior fusion model.
 - The Stable Diffusion model was used for our diffusion model, which refers to
-[this model](!https://https://huggingface.co/stabilityai/stable-diffusion-2) on Hugging Face.
+[this model](https://https://huggingface.co/stabilityai/stable-diffusion-2) on Hugging Face.
+
+We release the trained model at [this link](https://drive.google.com/file/d/1PSzsQdNCli36BsInOwkvWZUZFPfGKweo/view?usp=sharing)
 ~~~
 python B2.train_Diffusion_model.py
 ~~~
@@ -116,7 +118,7 @@ python B2.train_Diffusion_model.py
 &nbsp;
 
 ## C. Test Proposed FPDM Model
-
+___
 ### 1. Synthesis Images From Test Dataset
 
 Using the trained stage 2 Conditioned Diffusion Model, we generate images from the test dataset to evaluate our model.
@@ -136,6 +138,8 @@ python C2.eval.caculate_metrics.py
 ~~~
 
 ## D. Generated Results Examples
+___
+
 ### 1. Generated Results on DeepFashion Dataset
 FPDM generates visually coherent and consistent images under variations in both pose and source appearance.
 It accurately preserves fine-grained clothing details and maintains their positional and shape consistency across 
@@ -144,7 +148,9 @@ detail loss or inconsistency. Furthermore, FPDM demonstrates strong front-to-bac
 ability to preserve structural integrity and produce high-quality pose-conditioned images.
 
 All FPDM-generated images for the DeepFashion test set are available for download at the following link: 
-[Download generated results (Google Drive)](!https://drive.google.com/file/d/1jCKOwRxTsTVoD2veDbjjWgDsUK1TE3hW/view?usp=drive_link)
+[Resolution 512: Download results (Google Drive)](https://drive.google.com/file/d/18nxoIatPomHvVqk8KRXpGSpxAzDLV0HB/view?usp=sharing)
+[Resolution 256: Download results (Google Drive)](https://drive.google.com/file/d/1NoPnP1H8kTq2NX-uY51GvANQvG2-Y683/view?usp=sharing)
+
 ![Figure2](./fig/Figure2.jpg)  
 
 ### 2. Generated Results on Phoenix-2014-TG Dataset
@@ -155,8 +161,12 @@ inconsistencies and unnatural transitions between frames can be observed when th
 as a video. In future work, we plan to extend FPDM to a video generation model to alleviate these 
 limitations and improve overall video generation quality.
 
-All generated result images of FPDM on the Phoenix-2014-TG test dataset can be downloaded from the following link:
-[Download generated results (Google Drive)](!https://drive.google.com/file/d/1jCKOwRxTsTVoD2veDbjjWgDsUK1TE3hW/view?usp=drive_link)
-
+&nbsp;&nbsp;&nbsp;&nbsp;Source &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Pose 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; GT 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ours 
 ![video_1](./fig/video_1.gif)
 ![video_2](./fig/video_2.gif)
+
+All generated result images of FPDM on the Phoenix-2014-TG test dataset can be downloaded from the following link:
+[Download results (Google Drive)](https://drive.google.com/file/d/1L2mahCCh2FCjSKqp4JymH_oU8Tqysrq4/view?usp=sharing)
+
