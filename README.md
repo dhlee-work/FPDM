@@ -164,8 +164,11 @@ limitations and improve overall video generation quality.
 &nbsp;&nbsp;&nbsp;&nbsp;Source &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Pose 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; GT 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ours 
-![video_1](./fig/video_1.gif)
-![video_2](./fig/video_2.gif)
+![video_1](./fig/10December_2009_Thursday_heute_7944.gif)
+![video_2](./fig/21November_2011_Monday_heute_5437.gif)
+![video_3](./fig/24March_2011_Thursday_tagesschau_3938.gif)
+![video_4](./fig/29November_2009_Sunday_tagesschau_7045.gif)
+![video_5](./fig/25June_2010_Friday_tagesschau_3880.gif)
 
 All generated result images of FPDM on the Phoenix-2014-TG test dataset can be downloaded from the following link:
 [Download results (Google Drive)](https://drive.google.com/file/d/1L2mahCCh2FCjSKqp4JymH_oU8Tqysrq4/view?usp=sharing)
