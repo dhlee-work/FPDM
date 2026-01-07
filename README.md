@@ -41,11 +41,12 @@ while maintaining their positional and shape consistency across different target
 FPDM demonstrates strong front-to-back visual continuity when generating from a single side-view source, indicating its
 ability to preserve structural integrity and produce high-quality pose-conditioned images compared to existing methods.
 
+![Figure2](./fig/Figure2.jpg)  
+
 All FPDM-generated images for the DeepFashion test set are available for download at the following link: 
 [Resolution 512: Download results (Google Drive)](https://drive.google.com/file/d/18nxoIatPomHvVqk8KRXpGSpxAzDLV0HB/view?usp=sharing)
 [Resolution 256: Download results (Google Drive)](https://drive.google.com/file/d/1NoPnP1H8kTq2NX-uY51GvANQvG2-Y683/view?usp=sharing)
 
-![Figure2](./fig/Figure2.jpg)  
 
 [//]: # (### 3. Generated Results on Korean Sign Dataset)
 
