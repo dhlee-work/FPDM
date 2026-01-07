@@ -5,12 +5,20 @@
 ___
 
 ### 1. Generated Results on Phoenix-2014-TG Dataset
-Overall, the model preserves the source appearance while generating signers according to pose 
-variations. However, when the pose quality is poor in certain frames, the quality of the generated 
-images also degrades accordingly. Since FPDM is an image-based generation model, temporal 
-inconsistencies and unnatural transitions between frames can be observed when the results are viewed 
-as a video. In future work, we plan to extend FPDM to a video generation model to alleviate these 
-limitations and improve overall video generation quality.
+We apply the proposed FPDM to the Phoenix-2014-TG dataset to evaluate its ability to generate sign language
+images conditioned on pose sequences while preserving signer appearance. As illustrated in the figure below,
+the model consistently maintains the source signer’s identity and appearance across frames while effectively
+adapting the generated outputs to target pose variations, demonstrating successful disentanglement of
+appearance information from pose guidance and visually coherent transfer of pose dynamics. However,
+the quality of the generated images is sensitive to the accuracy of the input pose, and frames with 
+inaccurate or noisy pose estimates exhibit noticeable degradation, such as distorted body parts or unclear
+hand shapes. Furthermore, since FPDM is an image-based generation model without explicit temporal modeling,
+temporal inconsistencies—such as appearance flickering and unnatural transitions between consecutive 
+frames—may arise when the results are viewed as a video, even if individual frames appear visually 
+plausible. These observations highlight the limitations of frame-wise generation in capturing the long-range
+temporal coherence required for sign language video generation, motivating future work to extend FPDM 
+toward a video-based generation framework that explicitly models temporal dependencies to improve overall 
+video generation quality.
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Source
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Pose 
@@ -39,7 +47,27 @@ All FPDM-generated images for the DeepFashion test set are available for downloa
 
 ![Figure2](./fig/Figure2.jpg)  
 
+[//]: # (### 3. Generated Results on Korean Sign Dataset)
 
+[//]: # (FPDM을 사용하여 2022 Korean–Korean Sign Language Parallel Corpus Dataset을 학습하고 )
+
+[//]: # ()
+[//]: # (&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Source)
+
+[//]: # (&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Pose )
+
+[//]: # (&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; GT )
+
+[//]: # (&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ours )
+
+[//]: # ()
+[//]: # (<img src="./fig/LICC1731A_A02.gif" width="512"/><br>)
+
+[//]: # (<img src="./fig/LICC2092A_A01.gif" width="512"/><br>)
+
+[//]: # (<img src="./fig/LICC11183A_A08.gif" width="512"/><br>)
+
+[//]: # (<img src="./fig/CUTO0498A_A11.gif" width="512"/><br>)
 ## Abstract
 
 Pose-Guided Person Image Synthesis (PGPIS) aims to generate human images in specified poses 
