@@ -35,14 +35,11 @@ All generated result images of FPDM on the Phoenix-2014-TG test dataset can be d
 [Download results (Google Drive)](https://drive.google.com/file/d/1L2mahCCh2FCjSKqp4JymH_oU8Tqysrq4/view?usp=sharing)
 
 ### 2. Generated Results on DeepFashion Dataset
-We evaluate FPDM on the DeepFashion dataset to examine its robustness under variations in both pose and source appearance.
-The results demonstrate that FPDM generates visually coherent and consistent images across diverse pose configurations
-and appearance changes. In particular, the model accurately preserves fine-grained clothing details, such as textures 
-and garment structures, while maintaining their positional and shape consistency under different target poses and 
-source variations. Compared to other state-of-the-art methods, which often suffer from detail loss or visual inconsistency, 
-FPDM produces more stable and faithful appearance transfer results. Furthermore, FPDM exhibits strong front-to-back visual 
-continuity, indicating its ability to preserve structural integrity and generate high-quality pose-conditioned images
-even under challenging viewpoint and pose transformations.
+As shown in the figure below, FPDM generates visually coherent and stable results even under variations in both pose and 
+source appearance. The model reliably preserves fine-grained clothing details, such as stripe patterns and garment structures, 
+while maintaining their positional and shape consistency across different target poses and source variations. In addition, 
+FPDM demonstrates strong front-to-back visual continuity when generating from a single side-view source, indicating its
+ability to preserve structural integrity and produce high-quality pose-conditioned images compared to existing methods.
 
 All FPDM-generated images for the DeepFashion test set are available for download at the following link: 
 [Resolution 512: Download results (Google Drive)](https://drive.google.com/file/d/18nxoIatPomHvVqk8KRXpGSpxAzDLV0HB/view?usp=sharing)
